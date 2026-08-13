@@ -1,0 +1,57 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "ytreddit-devvit",
+  "permissions": {
+    "reddit": {
+      "enable": true,
+      "scope": "user"
+    },
+    "redis": true,
+    "http": {
+      "enable": true,
+      "domains": ["youtube.googleapis.com"]
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.js"
+  },
+  "scheduler": {
+    "tasks": {
+      "check-and-post": {
+        "endpoint": "/internal/scheduler/check-and-post",
+        "cron": "*/15 * * * *"
+      }
+    }
+  },
+  "settings": {
+    "global": {
+      "youtubeApiKey": {
+        "type": "string",
+        "label": "YouTube Data API v3 key",
+        "helpText": "A Google Cloud API key with the YouTube Data API v3 enabled. Set via `devvit settings set youtubeApiKey`, never committed.",
+        "isSecret": true
+      },
+      "subredditName": {
+        "type": "string",
+        "label": "Target subreddit",
+        "defaultValue": "BastropTX"
+      },
+      "minSecondsBetweenPosts": {
+        "type": "number",
+        "label": "Minimum seconds between posts",
+        "helpText": "Time-gate: the bot posts at most one video this often, regardless of how many are queued.",
+        "defaultValue": 3600
+      },
+      "maxVideoAgeHours": {
+        "type": "number",
+        "label": "Max video age to queue (hours)",
+        "helpText": "Videos published earlier than this are never queued -- prevents flooding the subreddit with a back-catalog.",
+        "defaultValue": 48
+      }
+    }
+  },
+  "dev": {
+    "subreddit": "REPLACE_WITH_TEST_SUB"
+  }
+}
