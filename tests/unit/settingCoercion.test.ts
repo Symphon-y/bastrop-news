@@ -8,9 +8,6 @@ describe('asBoolean', () => {
   });
 
   it('reads the strings `devvit settings set` actually sends', () => {
-    // The CLI hardcodes FormFieldType.STRING, so a BOOLEAN setting arrives as text.
-    // "false" is truthy in JS -- without coercion the kill switch could never be
-    // turned off from the CLI.
     expect(asBoolean('false', true)).toBe(false);
     expect(asBoolean('FALSE', true)).toBe(false);
     expect(asBoolean(' off ', true)).toBe(false);
@@ -29,7 +26,7 @@ describe('asBoolean', () => {
     expect(asBoolean('maybe', false)).toBe(false);
   });
 
-  it('defaults dry-run ON for anything ambiguous, so silence is the safe failure', () => {
+  it('defaults dry-run on for anything ambiguous, keeping silence the safe failure', () => {
     expect(asBoolean('nonsense', true)).toBe(true);
   });
 });

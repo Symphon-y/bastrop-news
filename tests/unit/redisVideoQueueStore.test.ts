@@ -29,6 +29,15 @@ describe('RedisVideoQueueStore', () => {
     expect(pending).toEqual(video);
   });
 
+  it('expires stored videos after 30 days, the YouTube retention cap', async () => {
+    const { store, redis } = makeStore();
+    const video = makeVideo('abc123', '2026-08-13T10:00:00.000Z');
+
+    await store.enqueueIfNew(video);
+
+    expect(redis.ttlOf('ytreddit:video:abc123')).toBe(30 * 24 * 60 * 60);
+  });
+
   it('is idempotent -- re-enqueueing a known video returns false', async () => {
     const { store } = makeStore();
     const video = makeVideo('abc123', '2026-08-13T10:00:00.000Z');

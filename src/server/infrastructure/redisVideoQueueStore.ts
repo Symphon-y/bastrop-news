@@ -4,6 +4,14 @@ import type { Video } from '../domain/video.js';
 const PENDING_QUEUE_KEY = 'ytreddit:pending_queue';
 const LAST_POSTED_AT_KEY = 'ytreddit:last_posted_at';
 
+/**
+ * YouTube's Developer Policies cap retention of non-authorized API data at 30 days.
+ * Expiring these records cannot resurrect a video: the age window refuses anything
+ * older than maxVideoAgeHours, so a record that expires here is already weeks past
+ * being eligible to queue.
+ */
+const VIDEO_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+
 function videoKey(videoId: string): string {
   return `ytreddit:video:${videoId}`;
 }
@@ -15,12 +23,12 @@ interface StoredVideo {
   publishedAt: string;
 }
 
-/** The minimal slice of @devvit/redis's RedisClient this adapter needs -- lets tests
- * inject a plain in-memory fake instead of Devvit's low-level protobuf plugin mock,
- * same approach as RedditPublisher's RedditClientLike. */
+/** The slice of @devvit/redis this adapter uses, narrow enough for tests to supply
+ * an in-memory fake. */
 export interface RedisClientLike {
   get(key: string): Promise<string | undefined>;
   set(key: string, value: string): Promise<string>;
+  expire(key: string, seconds: number): Promise<void>;
   zAdd(key: string, ...members: { member: string; score: number }[]): Promise<number>;
   zRange(
     key: string,
@@ -31,10 +39,9 @@ export interface RedisClientLike {
 }
 
 /**
- * "Posted" state is represented purely by absence from the pending_queue sorted set,
- * not by a field on the stored video -- once markPosted removes a videoId from the
- * queue, video:{id} still exists (so enqueueIfNew keeps treating it as known) but
- * nextPending will never return it again.
+ * "Posted" is represented by absence from the pending queue: markPosted removes the
+ * id from the sorted set while video:{id} survives, so enqueueIfNew still recognises
+ * the video as known and nextPending never returns it again.
  */
 export class RedisVideoQueueStore implements VideoQueueStore {
   constructor(private readonly redis: RedisClientLike) {}
@@ -52,6 +59,7 @@ export class RedisVideoQueueStore implements VideoQueueStore {
       publishedAt: video.publishedAt.toISOString(),
     };
     await this.redis.set(key, JSON.stringify(stored));
+    await this.redis.expire(key, VIDEO_RETENTION_SECONDS);
     await this.redis.zAdd(PENDING_QUEUE_KEY, {
       member: video.videoId,
       score: video.publishedAt.getTime(),

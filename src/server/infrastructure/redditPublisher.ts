@@ -1,7 +1,7 @@
 import { PublishError, type FormattedPost, type Publisher } from '../application/ports.js';
 
-/** The minimal slice of @devvit/reddit's RedditClient this adapter needs -- lets tests
- * inject a plain fake instead of needing Devvit's full plugin-mock test harness. */
+/** The slice of @devvit/reddit's RedditClient this adapter uses, narrow enough for
+ * tests to supply a plain fake. */
 export interface RedditClientLike {
   submitPost(opts: {
     subredditName: string;
@@ -20,6 +20,8 @@ export class RedditPublisher implements Publisher {
         subredditName: subreddit,
         title: post.title,
         url: post.url,
+        // Posts are attributed to the app account. Devvit's rules forbid automating
+        // actions on behalf of a redditor, and every post here is scheduler-driven.
         runAs: 'APP',
       });
       return submission.id;

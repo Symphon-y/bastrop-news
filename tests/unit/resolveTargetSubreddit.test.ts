@@ -10,9 +10,7 @@ describe('resolveTargetSubreddit', () => {
     expect(resolveTargetSubreddit('  BastropTX  ')).toBe('BastropTX');
   });
 
-  it('never silently falls back to a hardcoded production subreddit', () => {
-    // An earlier version defaulted to 'BastropTX', so a playtest install with dryRun
-    // off would have aimed at production. Failing loudly is the correct outcome.
+  it('throws rather than guessing a subreddit', () => {
     expect(() => resolveTargetSubreddit(undefined)).toThrow(/Cannot determine target subreddit/);
     expect(() => resolveTargetSubreddit('')).toThrow(/Cannot determine target subreddit/);
     expect(() => resolveTargetSubreddit('   ')).toThrow(/Cannot determine target subreddit/);

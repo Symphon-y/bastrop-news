@@ -9,6 +9,7 @@ import type { RedisClientLike } from '../../src/server/infrastructure/redisVideo
 export class FakeRedis implements RedisClientLike {
   private readonly strings = new Map<string, string>();
   private readonly sortedSets = new Map<string, Map<string, number>>();
+  private readonly expiries = new Map<string, number>();
 
   async get(key: string): Promise<string | undefined> {
     return this.strings.get(key);
@@ -17,6 +18,15 @@ export class FakeRedis implements RedisClientLike {
   async set(key: string, value: string): Promise<string> {
     this.strings.set(key, value);
     return 'OK';
+  }
+
+  async expire(key: string, seconds: number): Promise<void> {
+    this.expiries.set(key, seconds);
+  }
+
+  /** Test-only: the TTL set on a key, or undefined if it was left to live forever. */
+  ttlOf(key: string): number | undefined {
+    return this.expiries.get(key);
   }
 
   async zAdd(key: string, ...members: { member: string; score: number }[]): Promise<number> {

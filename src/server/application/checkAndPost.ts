@@ -19,10 +19,9 @@ export interface RunResult {
   readonly newlyQueued: number;
   readonly postedVideoId: string | null;
   readonly gateStatus: GateStatus;
-  /** Every video this run accepted into the queue -- the diagnostic that shows what
-   * the keyword filters actually let through, without waiting for it to be posted. */
+  /** Logged each run so the keyword filters' real behaviour is visible before a
+   * video reaches the subreddit. */
   readonly queuedThisRun: readonly QueuedVideoSummary[];
-  /** In dry-run mode only: the post that would have been submitted. */
   readonly wouldPost?: FormattedPost;
 }
 
@@ -35,8 +34,8 @@ export interface CheckAndPostUseCaseOptions {
   minSecondsBetweenPosts: number;
   maxVideoAgeHours: number;
   nowFn: () => Date;
-  /** When true, ingest normally but never publish, never mark posted, and never
-   * advance the time gate -- so a run reports exactly what it would have done. */
+  /** Ingests normally but suppresses three things: publishing, marking posted, and
+   * advancing the time gate. */
   dryRun?: boolean;
 }
 

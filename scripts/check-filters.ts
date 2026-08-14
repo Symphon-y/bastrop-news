@@ -1,15 +1,14 @@
 /**
- * Phase B2 diagnostic: what would the configured filters actually queue?
+ * Reports what the configured filters would queue right now, running the app's own
+ * YoutubeDataApiSource and KeywordFilter against live channel data.
  *
- * Runs the app's real YoutubeDataApiSource + KeywordFilter against live channel
- * data and reports, per channel, which of the latest uploads would be queued --
- * and crucially whether each match came from the title or only from the
- * description. A pile of DESCRIPTION-ONLY matches means a station's boilerplate
- * footer mentions Bastrop, which would flood the subreddit.
+ * Each match is labelled TITLE or DESCRIPTION-ONLY. Many DESCRIPTION-ONLY matches
+ * mean a channel's boilerplate description footer mentions a keyword, which would
+ * queue every one of its uploads.
  *
- *   node --experimental-strip-types scripts/check-filters.ts
+ *   npm run check:filters
  *
- * Reads YOUTUBE_API_KEY from .env.local (gitignored) or the environment.
+ * Reads YOUTUBE_API_KEY from the environment or a gitignored local dotenv file.
  * The key is never printed.
  */
 import { readFileSync } from 'node:fs';
@@ -28,7 +27,7 @@ function loadApiKey(): string {
         if (key) return key;
       }
     } catch {
-      // try the next candidate
+      continue;
     }
   }
   throw new Error(

@@ -9,9 +9,8 @@ export interface VideoFilter {
 }
 
 export interface VideoQueueStore {
-  /** Inserts the video if its id isn't already known. Returns true if newly added. */
   enqueueIfNew(video: Video): Promise<boolean>;
-  /** The oldest (by publishedAt) video that hasn't been posted yet, or null. */
+  /** Oldest by publishedAt, not by insertion order. */
   nextPending(): Promise<Video | null>;
   markPosted(videoId: string, postedAt: Date): Promise<void>;
   lastPostedAt(): Promise<Date | null>;
@@ -29,6 +28,5 @@ export interface PostFormatter {
 export class PublishError extends Error {}
 
 export interface Publisher {
-  /** Submits a link post, returns the created submission's id. */
   submitLinkPost(subreddit: string, post: FormattedPost): Promise<string>;
 }

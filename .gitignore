@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.devvit/
+
+# Local secrets. The key the deployed app uses lives in Devvit's secret store; a
+# local copy is only needed by `npm run check:filters`. This file also controls what
+# `devvit publish` packages as source for review.
+.env
+.env.*
+!.env.example

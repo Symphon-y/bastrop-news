@@ -13,12 +13,9 @@ const DEFAULT_MAX_VIDEO_AGE_HOURS = 48;
 const DEFAULT_DRY_RUN = true;
 
 /**
- * The app posts to the subreddit it is installed in, full stop -- there is no
- * configurable target. An earlier version defaulted to a hardcoded 'BastropTX',
- * which meant a playtest install would have aimed at production; a configurable
- * override was no better, since app settings are global and one set for the test
- * install would have followed the app to production. Deriving it from the install
- * makes posting to the wrong community structurally impossible.
+ * The app posts only to the subreddit it is installed in. There is deliberately no
+ * configurable target: app settings are global to every install, so any override
+ * would follow the app from one subreddit to another.
  */
 export function resolveTargetSubreddit(installedSubreddit: string | undefined): string {
   const installed = installedSubreddit?.trim();
@@ -27,10 +24,9 @@ export function resolveTargetSubreddit(installedSubreddit: string | undefined): 
 }
 
 /**
- * `devvit settings set` always transmits values as strings (it hardcodes
- * FormFieldType.STRING), so a setting declared BOOLEAN can come back as the string
- * "false" -- which is truthy. Without this, turning the dry-run kill switch off from
- * the CLI would appear to do nothing.
+ * `devvit settings set` transmits every value as a string (it hardcodes
+ * FormFieldType.STRING), and the string "false" is truthy in JavaScript. Settings
+ * that act as flags are therefore declared as strings and interpreted here.
  */
 export function asBoolean(value: unknown, fallback: boolean): boolean {
   if (typeof value === 'boolean') return value;
@@ -42,7 +38,7 @@ export function asBoolean(value: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
-/** Same hazard as asBoolean: a NUMBER setting can arrive as a string. */
+/** Numeric settings arrive as strings for the same reason. */
 export function asNumber(value: unknown, fallback: number): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -63,11 +59,7 @@ export async function loadConfig(): Promise<AppConfig> {
     DEFAULT_MIN_SECONDS_BETWEEN_POSTS,
   );
   const maxVideoAgeHours = asNumber(await settings.get('maxVideoAgeHours'), DEFAULT_MAX_VIDEO_AGE_HOURS);
-  const rawDryRun = await settings.get('dryRun');
-  const dryRun = asBoolean(rawDryRun, DEFAULT_DRY_RUN);
-  console.log(
-    `dryRun setting: raw=${JSON.stringify(rawDryRun)} type=${typeof rawDryRun} -> resolved=${dryRun}`,
-  );
+  const dryRun = asBoolean(await settings.get('dryRun'), DEFAULT_DRY_RUN);
 
   return { youtubeApiKey, minSecondsBetweenPosts, maxVideoAgeHours, dryRun };
 }
