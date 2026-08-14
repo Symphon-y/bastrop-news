@@ -60,9 +60,29 @@ This runs the app's **real** `YoutubeDataApiSource` and `KeywordFilter` against 
 channel data — not a reimplementation — so what it prints is exactly what the bot
 would queue. It never prints the key.
 
-- [ ] Ran `npm run check:filters`
+- [x] Ran `npm run check:filters` — **2026-08-14: risk cleared**
 
-**Reading the result:**
+**Result (2026-08-14), against full Data API descriptions:**
+
+| Channel | Passed filter | Within 48h | Fetch depth |
+| --- | --- | --- | --- |
+| Bastrop TX Network (unfiltered) | 15/15 | **1** | 101.7d |
+| KVUE (`bastrop`) | **0/15** | 0 | 10.1h |
+| KXAN (`bastrop`) | **0/15** | 0 | 11.6h |
+
+- **No description-boilerplate problem.** Neither station's footer mentions Bastrop, so
+  the keyword filter is doing real work. `KeywordFilter` can stay as-is (title *and*
+  description), which is the more useful behaviour — it catches stories that mention
+  Bastrop without putting it in the headline.
+- **A fresh install starts nearly silent.** Exactly one video is currently inside the
+  48h window (a city council meeting, ~33h old), so the bot would post that and then
+  wait. The main channel's back catalogue reaches 101 days inside a single 15-item
+  fetch, and the age window correctly excludes all of it.
+- **Fetch depth is not a bottleneck.** 15 items covers 10–12 hours of uploads even on
+  the busy news channels — roughly 40× the 15-minute poll interval, so nothing scrolls
+  out of view between runs. `MAX_RESULTS = 15` stays.
+
+**Reading the result (for future re-runs):**
 
 - **A handful of matches, all tagged `TITLE`** — filter is healthy, continue to B3.
 - **Many matches tagged `DESCRIPTION-ONLY`** (the script warns above 2) — the

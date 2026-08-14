@@ -7,7 +7,7 @@ pass before moving on.
 | Phase | File | Needs | Status |
 | --- | --- | --- | --- |
 | A — Build & safety rails | (done, see below) | nothing | ✅ complete |
-| B — Credentials & config | [phase-b-credentials.md](./phase-b-credentials.md) | Google + Reddit logins | ⬜ not started |
+| B — Credentials & config | [phase-b-credentials.md](./phase-b-credentials.md) | Google + Reddit logins | 🟡 B1–B2 done; B3–B4 left |
 | C — Playtest | [phase-c-playtest.md](./phase-c-playtest.md) | a test subreddit you mod | ⬜ not started |
 | D — Go live | [phase-d-go-live.md](./phase-d-go-live.md) | r/BastropTX mod access, app review | ⬜ not started |
 
@@ -56,5 +56,11 @@ syntactically valid CJS bundle, and `devvit.json` validates against
 - A client-less app (no `src/client/`, no post type) is schema-legal — only `name`
   is a required top-level field in `devvit.json`.
 - Channel cadence: Bastrop TX Network uploads a few times a month; KVUE and KXAN
-  upload constantly (3 videos inside 17 minutes on a sample day), which is exactly
-  why the keyword filter matters — see the Phase B description check.
+  upload constantly (15 uploads per 10–12 hours).
+- **The keyword-filter blowout risk is cleared** (2026-08-14). Neither KVUE's nor
+  KXAN's description boilerplate mentions Bastrop — 0/15 recent uploads match on
+  either channel — so `KeywordFilter` keeps matching descriptions as well as titles.
+  Full numbers in Phase B.
+- **Fetch depth is fine.** 15 items per channel covers 10–12 h of uploads even on the
+  busy news channels, ~40× the 15-minute poll interval, so nothing is missed between
+  runs. `MAX_RESULTS = 15` needs no change.
