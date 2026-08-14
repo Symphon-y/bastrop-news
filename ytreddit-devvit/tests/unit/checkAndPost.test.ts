@@ -32,6 +32,7 @@ function makeUseCase(options: {
   now?: Date;
   minSecondsBetweenPosts?: number;
   maxVideoAgeHours?: number;
+  dryRun?: boolean;
 }): CheckAndPostUseCase {
   return new CheckAndPostUseCase({
     videoSources: options.videoSources,
@@ -42,6 +43,7 @@ function makeUseCase(options: {
     minSecondsBetweenPosts: options.minSecondsBetweenPosts ?? MIN_SECONDS_BETWEEN_POSTS,
     maxVideoAgeHours: options.maxVideoAgeHours ?? MAX_VIDEO_AGE_HOURS,
     nowFn: () => options.now ?? NOW,
+    dryRun: options.dryRun,
   });
 }
 
@@ -190,5 +192,83 @@ describe('CheckAndPostUseCase', () => {
     expect(await queueStore.lastPostedAt()).toBeNull();
     const pending = await queueStore.nextPending();
     expect(pending?.videoId).toBe('abc123');
+  });
+
+  it('reports every video accepted this run, so filter behaviour is visible in logs', async () => {
+    const publisher = new FakePublisher();
+    const useCase = makeUseCase({
+      videoSources: [
+        new FakeVideoSource([makeVideo('main1', hoursBefore(3))]),
+        new FakeVideoSource([makeVideo('regional1', hoursBefore(1)), makeVideo('old1', hoursBefore(200))]),
+      ],
+      publisher,
+    });
+
+    const result = await useCase.run();
+
+    expect(result.queuedThisRun).toEqual([
+      { videoId: 'main1', title: 'Title main1' },
+      { videoId: 'regional1', title: 'Title regional1' },
+    ]);
+  });
+
+  describe('dry run', () => {
+    it('queues and reports what it would post without publishing', async () => {
+      const video = makeVideo('abc123', hoursBefore(1));
+      const publisher = new FakePublisher();
+      const queueStore = new FakeVideoQueueStore();
+      const useCase = makeUseCase({
+        videoSources: [new FakeVideoSource([video])],
+        publisher,
+        queueStore,
+        dryRun: true,
+      });
+
+      const result = await useCase.run();
+
+      expect(result.newlyQueued).toBe(1);
+      expect(result.gateStatus).toBe('dry_run');
+      expect(result.postedVideoId).toBeNull();
+      expect(result.wouldPost).toEqual({ title: video.title, url: video.url });
+      expect(publisher.calls).toHaveLength(0);
+    });
+
+    it('leaves the video pending and the time-gate untouched', async () => {
+      const video = makeVideo('abc123', hoursBefore(1));
+      const queueStore = new FakeVideoQueueStore();
+
+      await makeUseCase({
+        videoSources: [new FakeVideoSource([video])],
+        publisher: new FakePublisher(),
+        queueStore,
+        dryRun: true,
+      }).run();
+
+      expect(await queueStore.lastPostedAt()).toBeNull();
+      expect((await queueStore.nextPending())?.videoId).toBe('abc123');
+    });
+
+    it('posts the video already queued by a dry run once dry run is turned off', async () => {
+      const video = makeVideo('abc123', hoursBefore(1));
+      const queueStore = new FakeVideoQueueStore();
+      const publisher = new FakePublisher();
+
+      await makeUseCase({
+        videoSources: [new FakeVideoSource([video])],
+        publisher,
+        queueStore,
+        dryRun: true,
+      }).run();
+
+      const result = await makeUseCase({
+        videoSources: [new FakeVideoSource([])],
+        publisher,
+        queueStore,
+      }).run();
+
+      expect(result.newlyQueued).toBe(0);
+      expect(result.postedVideoId).toBe('abc123');
+      expect(publisher.calls).toHaveLength(1);
+    });
   });
 });

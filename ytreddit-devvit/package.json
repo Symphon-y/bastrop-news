@@ -5,8 +5,11 @@
   "description": "Devvit app: watches YouTube channels and posts new videos to r/BastropTX",
   "type": "module",
   "scripts": {
+    "build": "esbuild src/server/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/server/index.cjs",
+    "build:watch": "npm run build -- --watch",
     "typecheck": "tsc --noEmit",
-    "dev": "npx devvit playtest",
+    "check:filters": "node --experimental-transform-types scripts/check-filters.ts",
+    "dev": "devvit playtest",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -20,6 +23,8 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
+    "devvit": "0.14.0",
+    "esbuild": "0.25.9",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

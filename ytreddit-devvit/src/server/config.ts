@@ -5,11 +5,14 @@ export interface AppConfig {
   subredditName: string;
   minSecondsBetweenPosts: number;
   maxVideoAgeHours: number;
+  dryRun: boolean;
 }
 
 const DEFAULT_MIN_SECONDS_BETWEEN_POSTS = 3600;
 const DEFAULT_MAX_VIDEO_AGE_HOURS = 48;
 const DEFAULT_SUBREDDIT_NAME = 'BastropTX';
+/** Defaults to true so an install that hasn't been reviewed yet can't post on its own. */
+const DEFAULT_DRY_RUN = true;
 
 export async function loadConfig(): Promise<AppConfig> {
   const youtubeApiKey = await settings.get<string>('youtubeApiKey');
@@ -21,6 +24,7 @@ export async function loadConfig(): Promise<AppConfig> {
   const minSecondsBetweenPosts =
     (await settings.get<number>('minSecondsBetweenPosts')) ?? DEFAULT_MIN_SECONDS_BETWEEN_POSTS;
   const maxVideoAgeHours = (await settings.get<number>('maxVideoAgeHours')) ?? DEFAULT_MAX_VIDEO_AGE_HOURS;
+  const dryRun = (await settings.get<boolean>('dryRun')) ?? DEFAULT_DRY_RUN;
 
-  return { youtubeApiKey, subredditName, minSecondsBetweenPosts, maxVideoAgeHours };
+  return { youtubeApiKey, subredditName, minSecondsBetweenPosts, maxVideoAgeHours, dryRun };
 }

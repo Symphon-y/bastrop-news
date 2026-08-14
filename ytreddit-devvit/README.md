@@ -47,17 +47,40 @@ logic unit-tested against fakes:
 
 ```
 npm install
-npm test          # unit tests (Vitest)
+npm test           # unit tests (Vitest) -- 37 passing
 npm run typecheck  # tsc --noEmit
+npm run build      # esbuild -> dist/server/index.cjs
 ```
 
-Test coverage: all pure logic (`CheckAndPostUseCase`, filters, formatter, the
-decorator, YouTube response parsing, `RedditPublisher`'s error translation) is
-unit-tested with fakes/mocks — no network, no Devvit runtime needed. The one
-exception is `RedisVideoQueueStore`: Devvit doesn't ship a lightweight in-memory
-fake for `@devvit/redis` (only a lower-level plugin mock meant for their own test
-harness), so this adapter is verified via `devvit playtest` instead of an
-automated unit test.
+Test coverage: every adapter and all orchestration logic is unit-tested against
+hand-rolled fakes — no network, no Devvit runtime needed. Adapters that wrap a
+Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
+constructor injection and are tested against small in-memory fakes, rather than
+Devvit's lower-level protobuf plugin mocks.
+
+## Building
+
+`devvit.json` declares `server.entry` as `dist/server/index.cjs`, and the schema
+requires that file to be a self-contained **CommonJS** bundle. `npm run build`
+produces it with esbuild (~3.9 MB, ~90 ms). `devvit.json`'s `scripts.build` and
+`scripts.dev` point at `npm run build` / `npm run build:watch`, so `devvit upload`
+and `devvit playtest` build it themselves — but `npm run build` before uploading
+is harmless and rules out a whole class of confusion.
+
+## Dry run
+
+The `dryRun` global setting **defaults to on**. A dry run fetches, filters and
+queues exactly as normal, then logs the post it *would* have submitted — without
+publishing, without marking anything posted, and without advancing the post
+time-gate. Anything queued during a dry run posts normally once it's turned off:
+
+```
+npx devvit settings set dryRun     # false to go live, true to stop posting
+```
+
+It doubles as the kill switch. Every run also logs one `queued <videoId>: <title>`
+line per accepted video, which is how you see what the keyword filters are really
+matching before it reaches the subreddit.
 
 ## Configuring watched channels
 
@@ -105,36 +128,50 @@ During playtest, confirm: a real new video produces a real link post; a second
 immediate run does *not* double-post (gate closed); a video outside the age window
 is never queued.
 
+Going live on r/BastropTX requires `devvit publish`, **not** `devvit upload`.
+An uploaded-but-unpublished app can only be installed to a subreddit with fewer
+than 200 subscribers, and r/BastropTX has ~5,500. `publish` files a review
+request with your source attached:
+
 ```
-npx devvit upload      # private/unlisted version -- no public app review needed
+npm run build
+npx devvit publish                   # unlisted by default -- do NOT pass --public
+# ...wait for review approval...
 npx devvit install BastropTX
 npx devvit list installs BastropTX   # confirm it's live
 ```
 
+`publish` defaults to **unlisted**, so the app is reviewed but never listed in the
+public App Directory — it just becomes installable past the 200-subscriber limit.
+`npx devvit publish --withdraw` pulls a pending request back.
+
 No systemd, no Raspberry Pi, no Docker involved for this app — Reddit hosts and
 schedules it.
 
+## Launch
+
+The step-by-step path to going live — credentials, playtest, and deployment —
+lives in [`docs/launch/`](./docs/launch/README.md). Work those phases in order.
+
 ## Open items / things to verify hands-on
 
-These couldn't be fully verified without completing Devvit's interactive
-browser-based login, so treat them as first-playtest checks rather than settled
-facts:
+These need an interactive Devvit login or mod access, so treat them as
+first-playtest checks rather than settled facts:
 
-- **Build/bundle step**: `devvit.json`'s `server.dir`/`server.entry`
-  (`dist/server/index.js`) describe where Devvit's schema expects a server
-  bundle. It's *expected* that `devvit playtest`/`devvit upload` builds and
-  bundles `src/server/index.ts` automatically (their CLI ships its own esbuild
-  dependency), but this repo doesn't include a manual bundling step — if the
-  first `playtest` can't find/build the entrypoint, that's the first thing to
-  check.
-- **Client-less app**: confirmed via Devvit's own `devvit.json` schema that only
-  `name` is a required top-level field (no `post`/`blocks` client config
-  required), so omitting `src/client/` entirely should be valid — but this
-  hasn't been confirmed by an actual successful `playtest` run yet.
+- **Keyword filter blowout**: `KeywordFilter` matches descriptions as well as
+  titles. If KXAN's or KVUE's standard description footer lists Bastrop as a
+  coverage area, *every* upload from those high-volume channels matches. The
+  public RSS feeds look clean, but RSS truncates descriptions — only the Data API
+  shows the full text. There's a copy-paste check in
+  [`docs/launch/phase-b-credentials.md`](./docs/launch/phase-b-credentials.md);
+  run it before deploying.
+- **App icon**: `devvit.json` has no `marketingAssets` block. The schema requires
+  `marketingAssets.icon` (square 1024×1024 PNG, ≤500 KB) when that block is
+  present, and a publish request is likely to want one. Not yet created.
+- **Client-less app**: confirmed schema-legal (only `name` is required top-level),
+  but not yet confirmed by a successful `playtest` run.
 - **Domain review timing**: `youtube.googleapis.com` is on Devvit's global fetch
-  allowlist, but the docs state every requested domain is still "submitted for
-  review" on upload/playtest. Likely fast for a well-known Google API domain,
-  but budget for a short wait on the first `playtest` just in case.
-- **r/BastropTX AutoModerator**: check the subreddit's automod config for
-  link-post restrictions before relying on the scheduler for real — a removed
-  post still looks like success to this app.
+  allowlist, but every requested domain is still "submitted for review" on
+  upload/playtest. Likely fast for a Google API, but budget for a short wait.
+- **r/BastropTX AutoModerator**: check the automod config for link-post
+  restrictions — a removed post still looks like success to this app.

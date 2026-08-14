@@ -52,6 +52,13 @@ src/server/
 2. **Post (time-gated)** — if enough time has passed since the last post, pop the oldest
    pending video and publish it. Otherwise do nothing this tick.
 
+A `dryRun` setting (**default on**) makes step 2 report the post it would have submitted
+instead of publishing it — no publish, no `markPosted`, no gate advance. Ingest still
+happens, so anything queued during a dry run posts normally once it's switched off.
+It's also the kill switch. Every run returns `queuedThisRun` (each accepted video's id
+and title), which `index.ts` logs line by line — that's how an over-broad keyword filter
+gets caught before it floods the subreddit.
+
 This design and the four ports were carried over unchanged from an earlier Python/PRAW
 prototype for the same bot (see "Project history" below) — re-platformed to TypeScript,
 not redesigned.
@@ -68,15 +75,18 @@ or Devvit runtime required:
 - `YoutubeDataApiSource` — pure response parsing + fetch orchestration (mocked `fetch`)
 - `RedditPublisher` — constructor-injected against a fake `{submitPost}` object (no need
   for Devvit's heavier plugin-mock test harness)
+- `RedisVideoQueueStore` — same approach: it takes a `RedisClientLike` by constructor
+  injection and is tested against `tests/fakes/fakeRedis.ts`, an in-memory fake that
+  mirrors the two contract details the adapter depends on (`get()` resolves to
+  `undefined`, not `null`, for a missing key; `zRange` returns score-sorted
+  `{member, score}` objects). Devvit's own `RedisMock` is a low-level protobuf-plugin
+  mock needing an `ioredis` connection behind it — not worth it for a 4-method adapter.
 
-**Known gap**: `RedisVideoQueueStore` has no automated test. Devvit ships a `RedisMock`
-(`@devvit/redis/test/mocks/RedisMock`) but it's a low-level protobuf-plugin mock requiring
-a real or `ioredis-mock`-backed `ioredis` connection to back it — wiring that was judged
-not worth it for a 3-method adapter on a hobby project. This adapter is verified via
-`devvit playtest` instead.
-
-`npm run typecheck` — `tsc --noEmit`. `devvit.json` has also been validated directly
-against Reddit's published JSON Schema (`@devvit/shared-types/schemas/config-file.v1.json`)
+`npm run typecheck` — `tsc --noEmit`. `npm run build` — esbuild bundles
+`src/server/index.ts` into `dist/server/index.cjs`, the self-contained CommonJS file
+`devvit.json`'s `server.entry` points at; `devvit.json`'s `scripts.build`/`scripts.dev`
+hooks invoke it from `devvit upload`/`playtest`. `devvit.json` is validated against
+Reddit's published JSON Schema (`@devvit/shared-types/schemas/config-file.v1.json`)
 rather than hand-checked against docs prose.
 
 ### Configuring channels
@@ -100,24 +110,36 @@ Resolve a `@handle` to a channel ID via the YouTube Data API's `channels.list(fo
 npx devvit login
 npx devvit settings set youtubeApiKey        # Google Cloud API key w/ YouTube Data API v3 enabled
 npx devvit playtest <test-subreddit>         # a <200-subscriber sub you moderate
-npx devvit upload                            # private/unlisted, no public app review needed
+npx devvit publish                           # unlisted by default -- do NOT pass --public
+# ...wait for review approval...
 npx devvit install BastropTX
 ```
+
+`devvit upload` is **not** sufficient for r/BastropTX: an unpublished app installs only
+to subreddits under 200 subscribers, and r/BastropTX has ~5,500. `publish` files a
+review request with the source attached; it defaults to unlisted, so the app is
+reviewed but never listed in the public App Directory.
 
 Full details, quota math, and the "Fetch Domains" disclosure are in
 `ytreddit-devvit/README.md`.
 
+### Launching
+
+The ordered launch plan lives in `ytreddit-devvit/docs/launch/` — Phase A (build step,
+dry run, CLI pinning) is done; B (credentials), C (playtest), D (go-live) are checklists
+to work through as the Reddit/Google logins happen.
+
 ### Open items (not yet verified hands-on)
 
-These need an actual `devvit playtest` run to confirm — see `ytreddit-devvit/README.md`
-"Open items" for the full list:
-- Whether Devvit's CLI auto-builds/bundles `src/server/index.ts`, or whether a manual
-  bundle step is needed to satisfy `devvit.json`'s `server.dir`/`server.entry`.
-- Whether a client-less app (no `src/client/`, no post type) actually installs cleanly —
-  confirmed valid against the JSON Schema (only `name` is required top-level), but not
-  yet confirmed via a real `playtest`.
-- Whether the `youtube.googleapis.com` fetch-domain request clears review quickly, given
-  it's already on Devvit's global allowlist.
+- **Keyword filter blowout risk**: `KeywordFilter` matches descriptions as well as
+  titles, and KVUE/KXAN upload many videos a day. If their boilerplate description
+  footer names Bastrop, every upload matches. RSS descriptions look clean but are
+  truncated; the Data API check in `docs/launch/phase-b-credentials.md` settles it.
+- **App icon**: no `marketingAssets` block in `devvit.json` yet; the schema requires a
+  square 1024×1024 PNG (≤500 KB) when present, and a publish request likely wants one.
+- Whether a client-less app (no `src/client/`, no post type) installs cleanly —
+  schema-legal, not yet confirmed by a real `playtest`.
+- Whether the `youtube.googleapis.com` fetch-domain request clears review quickly.
 - r/BastropTX's AutoModerator config hasn't been checked for link-post restrictions.
 
 ### Project history

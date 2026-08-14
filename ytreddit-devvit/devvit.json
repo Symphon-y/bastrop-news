@@ -14,7 +14,11 @@
   },
   "server": {
     "dir": "dist/server",
-    "entry": "index.js"
+    "entry": "index.cjs"
+  },
+  "scripts": {
+    "build": "npm run build",
+    "dev": "npm run build:watch"
   },
   "scheduler": {
     "tasks": {
@@ -48,6 +52,12 @@
         "label": "Max video age to queue (hours)",
         "helpText": "Videos published earlier than this are never queued -- prevents flooding the subreddit with a back-catalog.",
         "defaultValue": 48
+      },
+      "dryRun": {
+        "type": "boolean",
+        "label": "Dry run (never post)",
+        "helpText": "When on, the app still checks channels and queues videos, but logs what it would post instead of posting, and does not advance the post time-gate. Defaults to ON -- turn it off only after reviewing a few runs' logs.",
+        "defaultValue": true
       }
     }
   },

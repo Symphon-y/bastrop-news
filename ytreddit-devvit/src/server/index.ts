@@ -1,4 +1,5 @@
 import { reddit } from '@devvit/reddit';
+import { redis } from '@devvit/redis';
 import { createServer, getServerPort } from '@devvit/server';
 import express from 'express';
 import { CheckAndPostUseCase } from './application/checkAndPost.js';
@@ -27,17 +28,23 @@ app.post('/internal/scheduler/check-and-post', async (_req, res) => {
 
     const useCase = new CheckAndPostUseCase({
       videoSources,
-      queueStore: new RedisVideoQueueStore(),
+      queueStore: new RedisVideoQueueStore(redis),
       formatter: new PassthroughFormatter(),
       publisher: new RedditPublisher(reddit),
       subreddit: config.subredditName,
       minSecondsBetweenPosts: config.minSecondsBetweenPosts,
       maxVideoAgeHours: config.maxVideoAgeHours,
       nowFn: () => new Date(),
+      dryRun: config.dryRun,
     });
 
     const result = await useCase.run();
-    console.log('check-and-post run complete', result);
+    // Log every accepted video's title explicitly -- this is how a dry run surfaces an
+    // over-broad keyword filter before it can flood the subreddit.
+    for (const video of result.queuedThisRun) {
+      console.log(`queued ${video.videoId}: ${video.title}`);
+    }
+    console.log(`check-and-post run complete${config.dryRun ? ' (DRY RUN -- nothing posted)' : ''}`, result);
     res.json(result);
   } catch (error) {
     console.error('check-and-post run failed', error);
