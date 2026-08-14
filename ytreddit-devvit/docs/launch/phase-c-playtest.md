@@ -16,7 +16,11 @@ npm run build     # expect dist/server/index.cjs
 
 ## C2 — First playtest run (dry run ON)
 
+Run this from `ytreddit-devvit/` — the CLI searches *upward* for `devvit.json`, so the
+repo root fails with the misleading `No project devvit.yaml config file found`.
+
 ```bash
+cd ytreddit-devvit
 npx devvit playtest bastrop_test
 ```
 

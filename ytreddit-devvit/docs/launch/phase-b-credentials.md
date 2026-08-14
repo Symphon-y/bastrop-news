@@ -96,21 +96,48 @@ would queue. It never prints the key.
 
 ## B3 — Devvit login and settings
 
+**Run every `devvit` command from `ytreddit-devvit/`, not the repo root.** The CLI
+finds the project by searching *upward* from your working directory for `devvit.json`
+(`project.js:181`), so from the repo root it never looks down into the subdirectory.
+When it fails it reports:
+
+```
+Error: No project devvit.yaml config file found.
+```
+
+That message is misleading — `devvit.json` is fully supported; the CLI just hardcodes
+the legacy `devvit.yaml` filename in the error string (`DevvitCommand.js:81`). It means
+"wrong directory", not "wrong config format".
+
+**The app must exist server-side before settings can be set.** `devvit settings set`
+looks the app up by slug and bails with *"Your app doesn't exist yet - you'll need to
+run 'devvit upload' before you can set settings"* (`set.js:34`). So the order is:
+
 ```bash
-npx devvit login            # opens a browser
-npx devvit whoami           # confirm the account
+cd ytreddit-devvit
+
+npx devvit login          # opens a browser
+npx devvit whoami         # confirm the account
+
+npm run build             # devvit.json's referenced files must exist, or the CLI
+                          # errors with "references files that don't exist"
+npx devvit upload         # creates the app; needed before any settings exist
+
 npx devvit settings set youtubeApiKey   # paste the key at the prompt
-npx devvit settings list    # confirm it's stored (value stays masked)
+npx devvit settings list                # confirm it's stored (stays masked)
 ```
 
 - [ ] Logged in as the account that should own the app
-- [ ] `youtubeApiKey` set
+- [ ] `npx devvit upload` succeeded (the app name must be globally unique — if
+      `ytreddit-devvit` is taken, change `name` in `devvit.json`, max 20 chars,
+      `^[a-z][a-z0-9-]*$`)
+- [ ] `youtubeApiKey` set and listed
 
-Note: `devvit settings set` writes **global, app-scoped** settings — the app has to
-exist server-side first. If this errors before an upload, run it again after the
-first `devvit playtest` or `devvit upload` in Phase C.
+Uploading here is safe and does **not** make the app public: an uploaded-but-unpublished
+app is visible only to you and installable only to subreddits under 200 subscribers —
+which is exactly what r/bastrop_test is. Publishing to r/BastropTX is Phase D.
 
-Leave `dryRun` alone for now. It defaults to **on**, which is what Phase C wants.
+Leave `dryRun` alone. It defaults to **on**, which is what Phase C wants.
 
 ## B4 — Pick the test subreddit
 
