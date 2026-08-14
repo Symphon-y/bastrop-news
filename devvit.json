@@ -18,6 +18,9 @@
     "dir": "dist/server",
     "entry": "index.cjs"
   },
+  "marketingAssets": {
+    "icon": "assets/icon.png"
+  },
   "scripts": {
     "build": "npm run build",
     "dev": "npm run build:watch"
