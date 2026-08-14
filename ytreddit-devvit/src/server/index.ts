@@ -1,10 +1,10 @@
 import { reddit } from '@devvit/reddit';
 import { redis } from '@devvit/redis';
-import { createServer, getServerPort } from '@devvit/server';
+import { context, createServer, getServerPort } from '@devvit/server';
 import express from 'express';
 import { CheckAndPostUseCase } from './application/checkAndPost.js';
 import { CHANNEL_WATCHES } from './channelsConfig.js';
-import { loadConfig } from './config.js';
+import { loadConfig, resolveTargetSubreddit } from './config.js';
 import { FilteredVideoSource } from './infrastructure/filteredVideoSource.js';
 import { PassthroughFormatter } from './infrastructure/passthroughFormatter.js';
 import { RedditPublisher } from './infrastructure/redditPublisher.js';
@@ -18,6 +18,7 @@ app.use(express.json());
 app.post('/internal/scheduler/check-and-post', async (_req, res) => {
   try {
     const config = await loadConfig();
+    const targetSubreddit = resolveTargetSubreddit(config.subredditName, context.subredditName);
 
     const videoSources = CHANNEL_WATCHES.map((watch) => {
       const rawSource = new YoutubeDataApiSource(watch.channelId, config.youtubeApiKey);
@@ -31,7 +32,7 @@ app.post('/internal/scheduler/check-and-post', async (_req, res) => {
       queueStore: new RedisVideoQueueStore(redis),
       formatter: new PassthroughFormatter(),
       publisher: new RedditPublisher(reddit),
-      subreddit: config.subredditName,
+      subreddit: targetSubreddit,
       minSecondsBetweenPosts: config.minSecondsBetweenPosts,
       maxVideoAgeHours: config.maxVideoAgeHours,
       nowFn: () => new Date(),
@@ -44,7 +45,13 @@ app.post('/internal/scheduler/check-and-post', async (_req, res) => {
     for (const video of result.queuedThisRun) {
       console.log(`queued ${video.videoId}: ${video.title}`);
     }
-    console.log(`check-and-post run complete${config.dryRun ? ' (DRY RUN -- nothing posted)' : ''}`, result);
+    // Always state the resolved target -- posting to the wrong subreddit is the one
+    // mistake that can't be undone quietly, so it should never be a guess.
+    console.log(
+      `check-and-post run complete -> r/${targetSubreddit}` +
+        `${config.dryRun ? ' (DRY RUN -- nothing posted)' : ''}`,
+      result,
+    );
     res.json(result);
   } catch (error) {
     console.error('check-and-post run failed', error);

@@ -40,8 +40,8 @@
       },
       "subredditName": {
         "type": "string",
-        "label": "Target subreddit",
-        "defaultValue": "BastropTX"
+        "label": "Target subreddit (leave blank)",
+        "helpText": "Leave blank -- the app posts to whichever subreddit it is installed in. Only set this to force posting somewhere else, and remember it is a global setting shared by every install."
       },
       "minSecondsBetweenPosts": {
         "type": "number",
