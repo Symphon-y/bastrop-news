@@ -17,7 +17,7 @@ npm run build     # expect dist/server/index.cjs
 ## C2 — First playtest run (dry run ON)
 
 ```bash
-npx devvit playtest <your-test-sub>
+npx devvit playtest bastrop_test
 ```
 
 `playtest` installs the app, watches for changes, and streams logs. It should run
@@ -43,14 +43,22 @@ ending in `(DRY RUN -- nothing posted)`. `gateStatus` will be `dry_run` whenever
 was something it would have posted.
 
 ```bash
-npx devvit logs <your-test-sub>
+npx devvit logs bastrop_test
 ```
 
-- [ ] `fetched` is roughly 45 (3 channels × up to 15 items)
-- [ ] **Every `queued` title is one you'd actually want on r/BastropTX.** This is the
-      real test of the keyword filter, on live data. A stream of KXAN/KVUE titles with
-      no obvious Bastrop connection means the description-boilerplate problem from
-      Phase B2 is live — stop and fix the filter.
+Phase B2 already measured what this *should* look like against live data, so these are
+concrete expectations, not vibes:
+
+- [ ] `fetched` is **45** (3 channels × 15 items)
+- [ ] `newlyQueued` on the very first run is **small — likely 1**, from Bastrop TX
+      Network. The other 14 of its uploads are outside the 48h window, and both news
+      channels currently match nothing. A first run that queues dozens means something
+      is wrong with the age window, not with the filter.
+- [ ] Every `queued` title is one you'd actually want on r/BastropTX. A stream of
+      KXAN/KVUE titles with no Bastrop connection would mean a station changed its
+      description boilerplate since B2 — re-run `npm run check:filters` to confirm,
+      then make `KeywordFilter` title-only for the news channels.
+- [ ] Subsequent runs report `newlyQueued: 0` until someone actually uploads
 - [ ] `wouldPost` names a sensible video
 - [ ] No `youtubeApiKey setting is not configured` error (if you see it, redo B3)
 

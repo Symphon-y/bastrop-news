@@ -118,9 +118,9 @@ Leave `dryRun` alone for now. It defaults to **on**, which is what Phase C wants
 It needs a subreddit that you moderate with **fewer than 200 subscribers** (Devvit
 enforces that limit for unpublished apps). A fresh private sub is fine.
 
-- [ ] Test subreddit chosen: `______________`
-- [ ] `dev.subreddit` in `devvit.json` updated (must match `^[a-zA-Z][a-zA-Z0-9_]*$`,
-      3–21 chars, no `r/` prefix)
+- [x] Test subreddit chosen: **`bastrop_test`**
+- [x] `dev.subreddit` in `devvit.json` updated — `bastrop_test` is 12 chars and matches
+      the required `^[a-zA-Z][a-zA-Z0-9_]*$` pattern; re-validated against the schema.
 
 ## Exit criteria
 

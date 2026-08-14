@@ -7,8 +7,8 @@ pass before moving on.
 | Phase | File | Needs | Status |
 | --- | --- | --- | --- |
 | A — Build & safety rails | (done, see below) | nothing | ✅ complete |
-| B — Credentials & config | [phase-b-credentials.md](./phase-b-credentials.md) | Google + Reddit logins | 🟡 B1–B2 done; B3–B4 left |
-| C — Playtest | [phase-c-playtest.md](./phase-c-playtest.md) | a test subreddit you mod | ⬜ not started |
+| B — Credentials & config | [phase-b-credentials.md](./phase-b-credentials.md) | Google + Reddit logins | 🟡 B1, B2, B4 done; B3 in progress |
+| C — Playtest | [phase-c-playtest.md](./phase-c-playtest.md) | r/bastrop_test | ⬜ not started |
 | D — Go live | [phase-d-go-live.md](./phase-d-go-live.md) | r/BastropTX mod access, app review | ⬜ not started |
 
 **Deployment path is settled:** r/BastropTX has **5,503 subscribers**, well over the
