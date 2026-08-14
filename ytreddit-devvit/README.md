@@ -1,5 +1,9 @@
 # ytreddit-devvit
 
+> The Devvit app is registered as **`bastrop-news`** (`name` in `devvit.json`), renamed
+> at first upload because app names are globally unique. This directory keeps its
+> original name. The test subreddit is r/bastrop_news_dev.
+
 A Devvit app that watches a small set of YouTube channels and posts new videos to
 r/BastropTX. Runs entirely on Reddit's infrastructure (no server/Pi to host) — a
 rewrite of an earlier Python/PRAW prototype, moved to Devvit after Reddit's

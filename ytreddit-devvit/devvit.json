@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "ytreddit-devvit",
+  "name": "bastrop-news",
   "permissions": {
     "reddit": {
       "enable": true,
@@ -9,7 +9,9 @@
     "redis": true,
     "http": {
       "enable": true,
-      "domains": ["youtube.googleapis.com"]
+      "domains": [
+        "youtube.googleapis.com"
+      ]
     }
   },
   "server": {
@@ -62,6 +64,6 @@
     }
   },
   "dev": {
-    "subreddit": "bastrop_test"
+    "subreddit": "bastrop_news_dev"
   }
 }

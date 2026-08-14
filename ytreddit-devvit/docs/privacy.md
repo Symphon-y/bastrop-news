@@ -1,4 +1,4 @@
-# Privacy Policy — ytreddit-devvit
+# Privacy Policy — bastrop-news
 
 _Last updated: 2026-08-13_
 

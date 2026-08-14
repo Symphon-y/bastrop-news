@@ -1,8 +1,8 @@
-# Terms & Conditions — ytreddit-devvit
+# Terms & Conditions — bastrop-news
 
 _Last updated: 2026-08-13_
 
-ytreddit-devvit is a small, non-commercial Devvit app that watches a fixed set of
+bastrop-news is a small, non-commercial Devvit app that watches a fixed set of
 YouTube channels and automatically submits a link post to r/BastropTX when a new,
 relevant video is published.
 

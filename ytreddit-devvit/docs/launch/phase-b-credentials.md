@@ -127,27 +127,33 @@ npx devvit settings set youtubeApiKey   # paste the key at the prompt
 npx devvit settings list                # confirm it's stored (stays masked)
 ```
 
-- [ ] Logged in as the account that should own the app
-- [ ] `npx devvit upload` succeeded (the app name must be globally unique — if
-      `ytreddit-devvit` is taken, change `name` in `devvit.json`, max 20 chars,
-      `^[a-z][a-z0-9-]*$`)
-- [ ] `youtubeApiKey` set and listed
+- [x] Logged in as the account that should own the app
+- [x] `npx devvit upload` succeeded. The app is registered as **`bastrop-news`** —
+      renamed from `ytreddit-devvit` during upload (app names are globally unique,
+      max 20 chars, `^[a-z][a-z0-9-]*$`). `devvit.json` and `package.json` both carry
+      the new name; the *directory* is still `ytreddit-devvit/`.
+- [x] All five settings registered server-side, confirmed via `devvit settings list`
+
+> **`settings list` does not prove the key's value is stored.** It calls `GetForm` and
+> prints only the setting *definitions* — key, label, type, is-secret (`list.js`,
+> `displayAppSettingsKeys`). There's no value column, and a secret can't be read back
+> by design. The real confirmation comes in Phase C: if the key is missing,
+> `loadConfig()` throws `youtubeApiKey setting is not configured` in the logs.
 
 Uploading here is safe and does **not** make the app public: an uploaded-but-unpublished
 app is visible only to you and installable only to subreddits under 200 subscribers —
-which is exactly what r/bastrop_test is. Publishing to r/BastropTX is Phase D.
+which is exactly what r/bastrop_news_dev is. Publishing to r/BastropTX is Phase D.
 
 Leave `dryRun` alone. It defaults to **on**, which is what Phase C wants.
 
 ## B4 — Pick the test subreddit
 
-`devvit.json` still has the placeholder `"dev": { "subreddit": "REPLACE_WITH_TEST_SUB" }`.
-It needs a subreddit that you moderate with **fewer than 200 subscribers** (Devvit
-enforces that limit for unpublished apps). A fresh private sub is fine.
+Needs a subreddit you moderate with **fewer than 200 subscribers** (Devvit enforces that
+limit for unpublished apps). A fresh private sub is fine.
 
-- [x] Test subreddit chosen: **`bastrop_test`**
-- [x] `dev.subreddit` in `devvit.json` updated — `bastrop_test` is 12 chars and matches
-      the required `^[a-zA-Z][a-zA-Z0-9_]*$` pattern; re-validated against the schema.
+- [x] Test subreddit: **`bastrop_news_dev`** — 16 chars, matches the required
+      `^[a-zA-Z][a-zA-Z0-9_]*$` pattern, within the 3–21 limit
+- [x] `dev.subreddit` set in `devvit.json`; re-validated against the schema
 
 ## Exit criteria
 

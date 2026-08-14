@@ -21,7 +21,7 @@ repo root fails with the misleading `No project devvit.yaml config file found`.
 
 ```bash
 cd ytreddit-devvit
-npx devvit playtest bastrop_test
+npx devvit playtest bastrop_news_dev
 ```
 
 `playtest` installs the app, watches for changes, and streams logs. It should run
@@ -47,7 +47,7 @@ ending in `(DRY RUN -- nothing posted)`. `gateStatus` will be `dry_run` whenever
 was something it would have posted.
 
 ```bash
-npx devvit logs bastrop_test
+npx devvit logs bastrop_news_dev
 ```
 
 Phase B2 already measured what this *should* look like against live data, so these are

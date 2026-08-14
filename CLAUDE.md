@@ -8,6 +8,11 @@ A [Devvit](https://developers.reddit.com/docs) app that watches a small set of Y
 channels and posts new videos to **r/BastropTX**. It runs entirely on Reddit's own
 infrastructure — no server, no Raspberry Pi, no Docker for this project.
 
+The Devvit app is registered as **`bastrop-news`** (`name` in `devvit.json` and
+`package.json`), renamed at first upload because Devvit app names are globally unique.
+The directory keeps its original `ytreddit-devvit/` name. The playtest subreddit is
+**r/bastrop_news_dev**; the production target is r/BastropTX.
+
 ### What it does
 
 - Every ~15 minutes, a Devvit Scheduler cron job checks the [YouTube Data API v3](https://developers.google.com/youtube/v3)
