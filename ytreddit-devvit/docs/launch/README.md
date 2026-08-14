@@ -8,12 +8,12 @@ pass before moving on.
 | --- | --- | --- | --- |
 | A — Build & safety rails | (done, see below) | nothing | ✅ complete |
 | B — Credentials & config | [phase-b-credentials.md](./phase-b-credentials.md) | Google + Reddit logins | ✅ complete |
-| C — Playtest | [phase-c-playtest.md](./phase-c-playtest.md) | r/bastrop_news_dev | ⬜ not started |
+| C — Playtest | [phase-c-playtest.md](./phase-c-playtest.md) | r/bastrop_test | ⬜ not started |
 | D — Go live | [phase-d-go-live.md](./phase-d-go-live.md) | r/BastropTX mod access, app review | ⬜ not started |
 
 **The Devvit app is named `bastrop-news`** (renamed from `ytreddit-devvit` at upload,
 since app names are globally unique). The directory is still `ytreddit-devvit/`. The
-test subreddit is **r/bastrop_news_dev**.
+test subreddit is **r/bastrop_test**.
 
 **Deployment path is settled:** r/BastropTX has **5,503 subscribers**, well over the
 200-subscriber ceiling for unpublished apps. Going live needs `devvit publish` (review

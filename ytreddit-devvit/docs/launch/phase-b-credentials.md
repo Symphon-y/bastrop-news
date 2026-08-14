@@ -142,7 +142,7 @@ npx devvit settings list                # confirm it's stored (stays masked)
 
 Uploading here is safe and does **not** make the app public: an uploaded-but-unpublished
 app is visible only to you and installable only to subreddits under 200 subscribers —
-which is exactly what r/bastrop_news_dev is. Publishing to r/BastropTX is Phase D.
+which is exactly what r/bastrop_test is. Publishing to r/BastropTX is Phase D.
 
 Leave `dryRun` alone. It defaults to **on**, which is what Phase C wants.
 
@@ -151,7 +151,7 @@ Leave `dryRun` alone. It defaults to **on**, which is what Phase C wants.
 Needs a subreddit you moderate with **fewer than 200 subscribers** (Devvit enforces that
 limit for unpublished apps). A fresh private sub is fine.
 
-- [x] Test subreddit: **`bastrop_news_dev`** — 16 chars, matches the required
+- [x] Test subreddit: **`bastrop_test`** — 12 chars, matches the required
       `^[a-zA-Z][a-zA-Z0-9_]*$` pattern, within the 3–21 limit
 - [x] `dev.subreddit` set in `devvit.json`; re-validated against the schema
 

@@ -11,7 +11,7 @@ infrastructure — no server, no Raspberry Pi, no Docker for this project.
 The Devvit app is registered as **`bastrop-news`** (`name` in `devvit.json` and
 `package.json`), renamed at first upload because Devvit app names are globally unique.
 The directory keeps its original `ytreddit-devvit/` name. The playtest subreddit is
-**r/bastrop_news_dev**; the production target is r/BastropTX.
+**r/bastrop_test**; the production target is r/BastropTX.
 
 ### What it does
 

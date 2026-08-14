@@ -2,7 +2,7 @@
 
 > The Devvit app is registered as **`bastrop-news`** (`name` in `devvit.json`), renamed
 > at first upload because app names are globally unique. This directory keeps its
-> original name. The test subreddit is r/bastrop_news_dev.
+> original name. The test subreddit is r/bastrop_test.
 
 A Devvit app that watches a small set of YouTube channels and posts new videos to
 r/BastropTX. Runs entirely on Reddit's infrastructure (no server/Pi to host) — a
@@ -122,10 +122,17 @@ app requests:
 
 ## Deploying
 
+Run every `devvit` command from this directory — the CLI searches *upward* for
+`devvit.json`, so the repo root fails with a misleading
+`No project devvit.yaml config file found`. Settings can only be set after the
+app exists server-side, so `upload` comes before `settings set`:
+
 ```
 npx devvit login
-npx devvit settings set youtubeApiKey        # paste the real key when prompted
-npx devvit playtest <your-test-subreddit>    # a <200-subscriber sub you moderate
+npm run build
+npx devvit upload                        # creates the app
+npx devvit settings set youtubeApiKey    # paste the real key when prompted
+npx devvit playtest bastrop_test         # a <200-subscriber sub you moderate
 ```
 
 During playtest, confirm: a real new video produces a real link post; a second
