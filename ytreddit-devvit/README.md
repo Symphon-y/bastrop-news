@@ -79,8 +79,16 @@ publishing, without marking anything posted, and without advancing the post
 time-gate. Anything queued during a dry run posts normally once it's turned off:
 
 ```
-npx devvit settings set dryRun     # false to go live, true to stop posting
+npx devvit settings set dryRun     # "off" to go live, "on" to stop posting
 ```
+
+**`dryRun` is deliberately a string setting, not a boolean.** `devvit settings set`
+transmits every value as a string (it hardcodes `FormFieldType.STRING`), and the
+server then coerces that string to the field's declared type. For a BOOLEAN field
+that coercion turns `"false"` into `true`, so **a boolean setting can never be
+switched off from the CLI** — it silently stays on and looks broken. As a string
+field the value arrives intact and `asBoolean` in `config.ts` interprets it, with
+anything unrecognised falling back to dry-run *on*.
 
 It doubles as the kill switch. Every run also logs one `queued <videoId>: <title>`
 line per accepted video, which is how you see what the keyword filters are really

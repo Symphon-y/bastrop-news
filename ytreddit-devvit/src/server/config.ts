@@ -63,7 +63,11 @@ export async function loadConfig(): Promise<AppConfig> {
     DEFAULT_MIN_SECONDS_BETWEEN_POSTS,
   );
   const maxVideoAgeHours = asNumber(await settings.get('maxVideoAgeHours'), DEFAULT_MAX_VIDEO_AGE_HOURS);
-  const dryRun = asBoolean(await settings.get('dryRun'), DEFAULT_DRY_RUN);
+  const rawDryRun = await settings.get('dryRun');
+  const dryRun = asBoolean(rawDryRun, DEFAULT_DRY_RUN);
+  console.log(
+    `dryRun setting: raw=${JSON.stringify(rawDryRun)} type=${typeof rawDryRun} -> resolved=${dryRun}`,
+  );
 
   return { youtubeApiKey, minSecondsBetweenPosts, maxVideoAgeHours, dryRun };
 }

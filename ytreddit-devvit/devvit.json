@@ -51,10 +51,10 @@
         "defaultValue": 48
       },
       "dryRun": {
-        "type": "boolean",
-        "label": "Dry run (never post)",
-        "helpText": "When on, the app still checks channels and queues videos, but logs what it would post instead of posting, and does not advance the post time-gate. Defaults to ON -- turn it off only after reviewing a few runs' logs.",
-        "defaultValue": true
+        "type": "string",
+        "label": "Dry run -- \"on\" or \"off\"",
+        "helpText": "\"on\" (default) checks and queues videos but logs what it would post instead of posting, and does not advance the time-gate. Set to \"off\" to post for real. Deliberately a string, not a boolean: `devvit settings set` transmits values as strings and the server coerces them, so a boolean field can never be set to false from the CLI. Anything unrecognised is treated as \"on\".",
+        "defaultValue": "on"
       }
     }
   },

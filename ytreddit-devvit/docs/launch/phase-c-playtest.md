@@ -92,12 +92,20 @@ npx devvit settings set dryRun    # answer false / off
       three channels stay out.
 - [ ] **Drain order.** With several queued, they post oldest-first, one per hour.
 
-Waiting a real hour is the honest way to confirm the gate. To move faster,
-temporarily `npx devvit settings set minSecondsBetweenPosts` to `120` — **and set it
-back to `3600` before Phase D.**
+To iterate faster, temporarily set the scheduler cron in `devvit.json` to `* * * * *`.
+`devvit playtest` watches the config file (`playtest.js:634`) and pushes a new version
+on save — no CLI command needed — so runs arrive every minute. This is safe: the time
+gate limits *posting*, not *checking*, which is exactly what a 1-minute cron proves.
 
-- [ ] `minSecondsBetweenPosts` restored to 3600
-- [ ] `dryRun` set back to **on** before touching r/BastropTX
+**Restore `*/15 * * * *` before Phase D.** Not cosmetic — quota:
+
+| Cron | Runs/day | Units/day (3 channels × 2) | Against the 10,000/day free quota |
+| --- | --- | --- | --- |
+| `*/15 * * * *` | 96 | **576** | 6% — comfortable |
+| `* * * * *` | 1,440 | **8,640** | 86% — one retry storm from exhaustion |
+
+- [x] Cron restored to `*/15 * * * *`
+- [ ] `dryRun` set back to **"on"** before touching r/BastropTX
 
 ## Exit criteria
 
