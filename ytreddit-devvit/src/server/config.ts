@@ -26,16 +26,44 @@ export function resolveTargetSubreddit(installedSubreddit: string | undefined): 
   throw new Error('Cannot determine target subreddit: the request carries no install context.');
 }
 
+/**
+ * `devvit settings set` always transmits values as strings (it hardcodes
+ * FormFieldType.STRING), so a setting declared BOOLEAN can come back as the string
+ * "false" -- which is truthy. Without this, turning the dry-run kill switch off from
+ * the CLI would appear to do nothing.
+ */
+export function asBoolean(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+  }
+  return fallback;
+}
+
+/** Same hazard as asBoolean: a NUMBER setting can arrive as a string. */
+export function asNumber(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
 export async function loadConfig(): Promise<AppConfig> {
   const youtubeApiKey = await settings.get<string>('youtubeApiKey');
   if (!youtubeApiKey) {
     throw new Error('youtubeApiKey setting is not configured -- run `devvit settings set youtubeApiKey`');
   }
 
-  const minSecondsBetweenPosts =
-    (await settings.get<number>('minSecondsBetweenPosts')) ?? DEFAULT_MIN_SECONDS_BETWEEN_POSTS;
-  const maxVideoAgeHours = (await settings.get<number>('maxVideoAgeHours')) ?? DEFAULT_MAX_VIDEO_AGE_HOURS;
-  const dryRun = (await settings.get<boolean>('dryRun')) ?? DEFAULT_DRY_RUN;
+  const minSecondsBetweenPosts = asNumber(
+    await settings.get('minSecondsBetweenPosts'),
+    DEFAULT_MIN_SECONDS_BETWEEN_POSTS,
+  );
+  const maxVideoAgeHours = asNumber(await settings.get('maxVideoAgeHours'), DEFAULT_MAX_VIDEO_AGE_HOURS);
+  const dryRun = asBoolean(await settings.get('dryRun'), DEFAULT_DRY_RUN);
 
   return { youtubeApiKey, minSecondsBetweenPosts, maxVideoAgeHours, dryRun };
 }

@@ -53,7 +53,11 @@ npx devvit logs bastrop_test
 Phase B2 already measured what this *should* look like against live data, so these are
 concrete expectations, not vibes:
 
-- [ ] `fetched` is **45** (3 channels × 15 items)
+- [x] `fetched` is **15**, not 45. `fetched` counts videos that survived the keyword
+      filters, not raw API results — `FilteredVideoSource` filters inside
+      `fetchLatest()`. So it's 15 from the unfiltered main channel plus 0 from each
+      news channel, exactly matching B2. A `fetched` of 45 would mean the filters had
+      stopped working.
 - [ ] `newlyQueued` on the very first run is **small — likely 1**, from Bastrop TX
       Network. The other 14 of its uploads are outside the 48h window, and both news
       channels currently match nothing. A first run that queues dozens means something
