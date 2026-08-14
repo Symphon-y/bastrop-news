@@ -38,11 +38,6 @@
         "helpText": "A Google Cloud API key with the YouTube Data API v3 enabled. Set via `devvit settings set youtubeApiKey`, never committed.",
         "isSecret": true
       },
-      "subredditName": {
-        "type": "string",
-        "label": "Target subreddit (leave blank)",
-        "helpText": "Leave blank -- the app posts to whichever subreddit it is installed in. Only set this to force posting somewhere else, and remember it is a global setting shared by every install."
-      },
       "minSecondsBetweenPosts": {
         "type": "number",
         "label": "Minimum seconds between posts",

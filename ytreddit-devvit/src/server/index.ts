@@ -18,7 +18,7 @@ app.use(express.json());
 app.post('/internal/scheduler/check-and-post', async (_req, res) => {
   try {
     const config = await loadConfig();
-    const targetSubreddit = resolveTargetSubreddit(config.subredditName, context.subredditName);
+    const targetSubreddit = resolveTargetSubreddit(context.subredditName);
 
     const videoSources = CHANNEL_WATCHES.map((watch) => {
       const rawSource = new YoutubeDataApiSource(watch.channelId, config.youtubeApiKey);
