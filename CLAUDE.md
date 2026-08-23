@@ -34,7 +34,7 @@ the gate, while leaving ingest intact.
 
 ## Testing
 
-`npm test` — 48 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
+`npm test` — 63 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
 Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
 constructor injection and are tested against in-memory fakes in `tests/fakes/`.
 
@@ -57,8 +57,13 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
 - **Checking is cheap; posting is gated.** A one-minute cron is safe behaviour-wise
   because the time gate limits posting, but it costs ~8,640 YouTube quota units/day
   against a 10,000 limit. The 15-minute schedule costs ~576.
-- **`fetched` in the run result counts videos that passed the keyword filters**, not raw
-  API results, because `FilteredVideoSource` filters inside `fetchLatest()`.
+- **`fetched` in the run result counts videos that passed every filter on the source**,
+  keyword and orientation alike, not raw API results, because `FilteredVideoSource`
+  filters inside `fetchLatest()`.
+- **`videos.list` omits `player.embedWidth`/`embedHeight` unless `maxHeight` or
+  `maxWidth` is sent.** Drop that parameter and every video comes back with no aspect
+  ratio, `LandscapeOnlyFilter` fails open on all of them, and the vertical filter becomes
+  a silent no-op. The `aspect-ratio:` log line exists to make that visible.
 
 ## Constraints that come from policy, not preference
 

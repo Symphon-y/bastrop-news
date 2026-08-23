@@ -3,13 +3,19 @@ import { redis } from '@devvit/redis';
 import { context, createServer, getServerPort } from '@devvit/server';
 import express from 'express';
 import { CheckAndPostUseCase } from './application/checkAndPost.js';
+import type { VideoSource } from './application/ports.js';
 import { CHANNEL_WATCHES } from './channelsConfig.js';
 import { loadConfig, resolveTargetSubreddit } from './config.js';
+import { AspectRatioVideoSource } from './infrastructure/aspectRatioVideoSource.js';
 import { FilteredVideoSource } from './infrastructure/filteredVideoSource.js';
 import { PassthroughFormatter } from './infrastructure/passthroughFormatter.js';
 import { RedditPublisher } from './infrastructure/redditPublisher.js';
 import { RedisVideoQueueStore } from './infrastructure/redisVideoQueueStore.js';
-import { AcceptAllFilter, KeywordFilter } from './infrastructure/videoFilters.js';
+import {
+  AcceptAllFilter,
+  KeywordFilter,
+  LandscapeOnlyFilter,
+} from './infrastructure/videoFilters.js';
 import { YoutubeDataApiSource } from './infrastructure/youtubeDataApiSource.js';
 
 const app = express();
@@ -24,7 +30,15 @@ app.post('/internal/scheduler/check-and-post', async (_req, res) => {
       const rawSource = new YoutubeDataApiSource(watch.channelId, config.youtubeApiKey);
       const filter =
         watch.keywords.length > 0 ? new KeywordFilter(watch.keywords) : new AcceptAllFilter();
-      return new FilteredVideoSource(rawSource, filter);
+      const source: VideoSource = new FilteredVideoSource(rawSource, filter);
+      if (!watch.excludeVertical || !config.excludeVerticalVideos) return source;
+      // Look up aspect ratios only for what survived the keyword filter. That call costs
+      // a quota unit, and on most runs the news channels have no Bastrop story at all --
+      // in which case the lookup is skipped entirely.
+      return new FilteredVideoSource(
+        new AspectRatioVideoSource(source, config.youtubeApiKey),
+        new LandscapeOnlyFilter(),
+      );
     });
 
     const useCase = new CheckAndPostUseCase({

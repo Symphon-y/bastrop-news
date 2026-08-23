@@ -6,6 +6,9 @@
  * mean a channel's boilerplate description footer mentions a keyword, which would
  * queue every one of its uploads.
  *
+ * Videos are also labelled VERTICAL where the channel has excludeVertical set, so the
+ * duplicate Shorts the filter removes are visible before deploying a change.
+ *
  *   npm run check:filters
  *
  * Reads YOUTUBE_API_KEY from the environment or a gitignored local dotenv file.
@@ -13,7 +16,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { CHANNEL_WATCHES } from '../src/server/channelsConfig.ts';
-import { KeywordFilter } from '../src/server/infrastructure/videoFilters.ts';
+import { AspectRatioVideoSource } from '../src/server/infrastructure/aspectRatioVideoSource.ts';
+import { KeywordFilter, LandscapeOnlyFilter } from '../src/server/infrastructure/videoFilters.ts';
 import { YoutubeDataApiSource } from '../src/server/infrastructure/youtubeDataApiSource.ts';
 
 function loadApiKey(): string {
@@ -42,6 +46,7 @@ const apiKey = loadApiKey();
 const cutoff = new Date(Date.now() - MAX_VIDEO_AGE_HOURS * 60 * 60 * 1000);
 let totalQueued = 0;
 let descriptionOnlyMatches = 0;
+let totalVerticalsDropped = 0;
 
 function ageLabel(publishedAt: Date): string {
   const hours = (Date.now() - publishedAt.getTime()) / (60 * 60 * 1000);
@@ -49,8 +54,15 @@ function ageLabel(publishedAt: Date): string {
   return publishedAt >= cutoff ? `${age}` : `${age}, TOO OLD`;
 }
 
+const landscapeOnly = new LandscapeOnlyFilter();
+
 for (const watch of CHANNEL_WATCHES) {
-  const source = new YoutubeDataApiSource(watch.channelId, apiKey);
+  const rawSource = new YoutubeDataApiSource(watch.channelId, apiKey);
+  // Unlike the deployed app, enrich every upload rather than only the keyword survivors:
+  // this is a manual diagnostic, and seeing the orientation of everything is the point.
+  const source = watch.excludeVertical
+    ? new AspectRatioVideoSource(rawSource, apiKey)
+    : rawSource;
   const videos = await source.fetchLatest();
   const label = watch.keywords.length > 0 ? `keywords: ${watch.keywords.join(', ')}` : 'ALL uploads';
   console.log(`\n=== ${watch.channelId} (${label}) ===`);
@@ -59,12 +71,19 @@ for (const watch of CHANNEL_WATCHES) {
   const lowerKeywords = watch.keywords.map((k) => k.toLowerCase());
   let passedFilter = 0;
   let queued = 0;
+  let verticalsDropped = 0;
 
   for (const video of videos) {
     if (filter && !filter.matches(video)) continue;
     passedFilter += 1;
+    const dropped = watch.excludeVertical && !landscapeOnly.matches(video);
     const withinWindow = video.publishedAt >= cutoff;
-    if (withinWindow) {
+    if (dropped) {
+      if (withinWindow) {
+        verticalsDropped += 1;
+        totalVerticalsDropped += 1;
+      }
+    } else if (withinWindow) {
       queued += 1;
       totalQueued += 1;
     }
@@ -75,15 +94,22 @@ for (const watch of CHANNEL_WATCHES) {
       if (!inTitle && withinWindow) descriptionOnlyMatches += 1;
       tag = inTitle ? 'TITLE' : 'DESCRIPTION-ONLY';
     }
+    const shape =
+      video.aspectRatio === undefined
+        ? ''
+        : dropped
+          ? ` [${video.aspectRatio.toFixed(2)} VERTICAL -> DROPPED]`
+          : ` [${video.aspectRatio.toFixed(2)}]`;
     // only the ones that would really be queued are worth listing in full
     if (withinWindow || !filter) {
-      console.log(`  [${tag}] (${ageLabel(video.publishedAt)}) ${video.title.slice(0, 64)}`);
+      console.log(`  [${tag}] (${ageLabel(video.publishedAt)})${shape} ${video.title.slice(0, 64)}`);
     }
   }
 
   console.log(
     `  ${passedFilter}/${videos.length} passed the filter; ` +
-      `${queued} also within the ${MAX_VIDEO_AGE_HOURS}h age window -> would actually queue`,
+      `${queued} also within the ${MAX_VIDEO_AGE_HOURS}h age window -> would actually queue` +
+      `${watch.excludeVertical ? ` (${verticalsDropped} vertical duplicates dropped)` : ''}`,
   );
 
   // How far back does one fetch reach? If this is smaller than the scheduler's
@@ -99,7 +125,10 @@ for (const watch of CHANNEL_WATCHES) {
   }
 }
 
-console.log(`\n--- ${totalQueued} videos would actually be queued right now ---`);
+console.log(
+  `\n--- ${totalQueued} videos would actually be queued right now ` +
+    `(${totalVerticalsDropped} vertical duplicates dropped) ---`,
+);
 console.log(
   `(fetch depth is 15 videos per channel, so anything older than the 15th most recent\n` +
     ` upload is invisible regardless of the ${MAX_VIDEO_AGE_HOURS}h window)`,

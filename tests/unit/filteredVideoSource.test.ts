@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { Video } from '../../src/server/domain/video.js';
 import { FilteredVideoSource } from '../../src/server/infrastructure/filteredVideoSource.js';
-import { AcceptAllFilter, KeywordFilter } from '../../src/server/infrastructure/videoFilters.js';
+import {
+  AcceptAllFilter,
+  KeywordFilter,
+  LandscapeOnlyFilter,
+} from '../../src/server/infrastructure/videoFilters.js';
 
-function makeVideo(videoId: string, title: string): Video {
+function makeVideo(videoId: string, title: string, aspectRatio?: number): Video {
   return {
     videoId,
     title,
     description: '',
     url: `https://www.youtube.com/watch?v=${videoId}`,
     publishedAt: new Date('2026-08-01T00:00:00Z'),
+    aspectRatio,
   };
 }
 
@@ -41,6 +46,23 @@ describe('FilteredVideoSource', () => {
     const result = await source.fetchLatest();
 
     expect(result.map((v) => v.videoId)).toEqual(['b']);
+  });
+
+  // Filters compose by nesting the decorator, which is why no composite filter exists.
+  it('applies both filters when two are nested', async () => {
+    const videos = [
+      makeVideo('a', 'Bastrop news', 1.778),
+      makeVideo('b', 'Bastrop news, vertical cut', 0.5625),
+      makeVideo('c', 'Austin news', 1.778),
+    ];
+    const source = new FilteredVideoSource(
+      new FilteredVideoSource(new FakeInnerSource(videos), new KeywordFilter(['bastrop'])),
+      new LandscapeOnlyFilter(),
+    );
+
+    const result = await source.fetchLatest();
+
+    expect(result.map((v) => v.videoId)).toEqual(['a']);
   });
 
   it('returns an empty list when nothing matches', async () => {

@@ -5,12 +5,16 @@ export interface AppConfig {
   minSecondsBetweenPosts: number;
   maxVideoAgeHours: number;
   dryRun: boolean;
+  excludeVerticalVideos: boolean;
 }
 
 const DEFAULT_MIN_SECONDS_BETWEEN_POSTS = 3600;
 const DEFAULT_MAX_VIDEO_AGE_HOURS = 48;
 /** Defaults to true so an install that hasn't been reviewed yet can't post on its own. */
 const DEFAULT_DRY_RUN = true;
+/** Defaults to true because the duplicate Shorts are the reason this setting exists,
+ * and the filter fails open, so leaving it on cannot silently suppress news. */
+const DEFAULT_EXCLUDE_VERTICAL_VIDEOS = true;
 
 /**
  * The app posts only to the subreddit it is installed in. There is deliberately no
@@ -60,6 +64,10 @@ export async function loadConfig(): Promise<AppConfig> {
   );
   const maxVideoAgeHours = asNumber(await settings.get('maxVideoAgeHours'), DEFAULT_MAX_VIDEO_AGE_HOURS);
   const dryRun = asBoolean(await settings.get('dryRun'), DEFAULT_DRY_RUN);
+  const excludeVerticalVideos = asBoolean(
+    await settings.get('excludeVerticalVideos'),
+    DEFAULT_EXCLUDE_VERTICAL_VIDEOS,
+  );
 
-  return { youtubeApiKey, minSecondsBetweenPosts, maxVideoAgeHours, dryRun };
+  return { youtubeApiKey, minSecondsBetweenPosts, maxVideoAgeHours, dryRun, excludeVerticalVideos };
 }

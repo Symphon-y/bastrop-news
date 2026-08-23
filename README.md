@@ -15,6 +15,13 @@ Every 15 minutes the app checks each watched channel for new uploads:
 - **Regional news channels** (KVUE, KXAN) are keyword-filtered. Their videos are only
   considered if the title or description mentions Bastrop, because those stations cover
   the whole Austin area and most of their output is not local to Bastrop.
+- **Vertical uploads from the news channels are dropped.** Both stations reformat a
+  story into a horizontal video and a vertical Short and publish them within the hour,
+  and both copies match the keywords, so the subreddit used to get the story twice. The
+  two are titled differently enough that comparing titles does not reliably pair them,
+  so the app compares the shape of the video instead. The trade-off is deliberate: a
+  story a station publishes *only* as a Short is not posted. This does not apply to the
+  main channel, where a vertical upload is the story rather than a reformat of one.
 
 Anything new and recent enough is added to a queue. Then, at most once per hour, the
 app takes the oldest queued video and submits it as a plain link post — the video's
@@ -62,6 +69,17 @@ subreddit.
 month and the news channels rarely match, so more than a couple of posts a day means a
 filter is too broad. Set `dryRun` back on if that happens.
 
+**Every orientation check is logged too**, as
+`aspect-ratio: <n> checked, <n> known, <n> vertical`. A run that reports zero known
+ratios means the lookup is failing and nothing is being filtered — the app keeps posting
+rather than stopping, because a video whose orientation cannot be determined is treated
+as horizontal.
+
+**If the vertical filter drops something it should not**, set `excludeVerticalVideos` to
+`off`. Nothing is lost permanently: the video is fetched and queued again on the next
+run, as long as it is still inside the age window and still among the channel's 15 most
+recent uploads.
+
 ## Configuration
 
 All settings are optional except the YouTube API key.
@@ -72,6 +90,7 @@ All settings are optional except the YouTube API key.
 | `dryRun` | `on` | `off` to post for real. The kill switch. |
 | `minSecondsBetweenPosts` | `3600` | Minimum gap between posts. |
 | `maxVideoAgeHours` | `48` | Videos older than this are never queued. |
+| `excludeVerticalVideos` | `on` | `off` to keep vertical videos. Drops the duplicate Shorts the news channels post alongside each story. |
 
 There is no setting for which subreddit to post to. The app posts to the subreddit it is
 installed in, so it cannot post anywhere else.
@@ -114,14 +133,21 @@ deliberately never used. Three channels checked every 15 minutes is roughly 576 
 per day against a 10,000/day free quota. Checking every minute instead would cost about
 8,640, so the 15-minute schedule is what keeps this comfortable.
 
+Checking orientation adds at most one unit per news channel per run — a single
+`videos.list` call covering every candidate at once, made only when that channel has a
+video that already passed the keyword filter. Most runs have none and skip the call
+entirely, so the realistic ceiling is under 770 units per day.
+
 ## Fetch Domains
 
 The following domains are requested for this app:
 
-- `youtube.googleapis.com` — the official YouTube Data API v3, used to list recent
-  uploads for the configured channels. This is the app's only external request. It was
-  chosen over YouTube's RSS feeds, which are served from `www.youtube.com`, to keep the
-  request surface to a single documented API endpoint.
+- `youtube.googleapis.com` — the official YouTube Data API v3. The app uses it to list
+  recent uploads for the configured channels (`channels.list`, `playlistItems.list`) and
+  to read the player dimensions of a candidate video, which is how it tells a vertical
+  Short from the horizontal original (`videos.list`). This is the app's only external
+  request. It was chosen over YouTube's RSS feeds, which are served from
+  `www.youtube.com`, so that every request goes to one documented API on one domain.
 
 ## Notes for app review
 
