@@ -164,7 +164,12 @@ The following domains are requested for this app:
 - **Posting is rate-limited in the app itself**, independently of the check schedule —
   see the three rules above.
 
-Policies: [Privacy Policy](docs/privacy.md) · [Terms and Conditions](docs/terms.md)
+Policies: [Privacy Policy](https://github.com/Symphon-y/bastrop-news/blob/main/docs/privacy.md) ·
+[Terms and Conditions](https://github.com/Symphon-y/bastrop-news/blob/main/docs/terms.md)
+
+These are the same URLs saved as the app's Privacy Policy and Terms URLs on its
+developer-settings page, so `docs/privacy.md` and `docs/terms.md` are the live source of
+both — there is no separate hosted copy to keep in sync.
 
 ## Architecture
 

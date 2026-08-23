@@ -64,6 +64,19 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   `maxWidth` is sent.** Drop that parameter and every video comes back with no aspect
   ratio, `LandscapeOnlyFilter` fails open on all of them, and the vertical filter becomes
   a silent no-op. The `aspect-ratio:` log line exists to make that visible.
+- **`devvit upload` does not update any install.** It creates a version; subreddits stay
+  on whatever they had until `devvit install <subreddit> <app>@<version>` runs. A new
+  setting will not appear in `devvit settings list` until an install is actually on the
+  version that declares it.
+- **A private app cannot be upgraded in a subreddit with 200+ subscribers.** An install
+  from when the subreddit was smaller keeps working, but upgrading it fails with
+  `You're only allowed to install private apps in small subreddits (<200 subs)`. r/BastropTX
+  is over that line, so shipping anything there requires `devvit publish` and review;
+  r/bastrop_test is not, and takes upgrades directly.
+- **`devvit publish` is interactive.** It prompts before packaging the source zip, so it
+  cannot be driven from a non-interactive shell. The zip respects `.gitignore` -- which
+  is what keeps the dotenv files out of it, and why an untracked scratch file in the
+  working tree ships to reviewers.
 
 ## Constraints that come from policy, not preference
 
@@ -74,10 +87,16 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   means an expired record can never be re-queued.
 - **`dryRun` defaults to on**, so a fresh install cannot post until someone decides it
   should.
-- **Publishing requires policy URLs.** Because the app uses HTTP fetch, `devvit publish`
-  refuses to submit until a Privacy Policy URL and a Terms URL are saved on the app's
-  developer-settings page. `docs/privacy.md` and `docs/terms.md` are the source; they
-  carry YouTube-mandated disclosures and should not be trimmed without checking the
+- **Publishing requires policy URLs, and they are already saved.** Because the app uses
+  HTTP fetch, `devvit publish` refuses to submit until a Privacy Policy URL and a Terms
+  URL are set on the app's developer-settings page. Both are configured, pointing at the
+  copies rendered on GitHub:
+  - https://github.com/Symphon-y/bastrop-news/blob/main/docs/privacy.md
+  - https://github.com/Symphon-y/bastrop-news/blob/main/docs/terms.md
+
+  `docs/privacy.md` and `docs/terms.md` are the source of those pages, so editing them
+  changes what the saved URLs serve -- there is no separate hosted copy to keep in sync.
+  They carry YouTube-mandated disclosures and should not be trimmed without checking the
   YouTube API Services Developer Policies.
 - **The README is a review criterion.** Reddit rejects apps whose README is missing,
   templated, or vague, and requires a `## Fetch Domains` section justifying each domain.
