@@ -3,7 +3,8 @@
 A Reddit app that watches a small, fixed list of YouTube channels and posts new videos
 to the subreddit it is installed in. It was built for **r/BastropTX**, where the local
 government channel publishes city council and commission recordings that residents
-otherwise have to go looking for.
+otherwise have to go looking for. It can also post a daily digest of local events from
+[bastropcountycalendar.com](https://bastropcountycalendar.com).
 
 It runs entirely on Reddit's infrastructure. There is no server to host.
 
@@ -35,6 +36,26 @@ Three rules keep it quiet, and they matter more than the checking:
 - **An age window** (default 48 hours). Videos older than that are never queued, so
   installing the app does not flood the subreddit with a channel's back catalogue.
 
+### Daily events digest
+
+When the `eventsDigest` setting is on, the app also posts **one text post each morning**
+titled *Happening today in Bastrop County: Sunday, November 22*. It lists that day's
+events with time, venue, and a link to each event's page. All-day and multi-day events
+come first, then timed events in order.
+
+- **The events come from a public Google Calendar.** A separate Google Apps Script
+  (`apps-script/`) fills that calendar each morning at 5 AM from
+  bastropcountycalendar.com's listings, used with the site owner's permission. Residents
+  can subscribe to the same calendar.
+- **At most one digest per day.** The app checks hourly. It posts on the first check at
+  or after `eventsDigestHour` (7 AM Central by default), and remembers the date it
+  posted so it never posts twice in a day. A failed post is retried the next hour.
+- **No events, no post.** On a day with nothing listed, the app posts nothing.
+- **Moderators can remove a listing** by deleting it from the Google Calendar. The sync
+  then leaves it out for good, so it never appears in a digest.
+
+The digest replaces what would otherwise be about ten individual event posts a day.
+
 Posts are made by the app's own account. The app never posts on behalf of a redditor.
 
 ## Who it is for
@@ -47,7 +68,8 @@ automatically, without a volunteer having to check for new videos by hand.
 **The kill switch is the `dryRun` setting.** While it is on — and it is on by default —
 the app still checks channels, filters, and queues videos, but instead of posting it
 logs the post it *would* have made. Nothing reaches the subreddit. Turn it on at any
-time to stop the app posting without uninstalling it.
+time to stop the app posting without uninstalling it. It covers the events digest too:
+in a dry run the full digest text is logged instead of posted.
 
 **`dryRun` is a string setting, not a boolean, and this is deliberate.** `devvit
 settings set` transmits every value as a string, and the string `"false"` is truthy in
@@ -82,15 +104,21 @@ recent uploads.
 
 ## Configuration
 
-All settings are optional except the YouTube API key.
+All settings are optional except the YouTube API key, and the Calendar API key when
+the events digest is on.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `youtubeApiKey` | — | Google Cloud API key with YouTube Data API v3 enabled. Required. |
-| `dryRun` | `on` | `off` to post for real. The kill switch. |
-| `minSecondsBetweenPosts` | `3600` | Minimum gap between posts. |
+| `dryRun` | `on` | `off` to post for real. The kill switch, for videos and the digest. |
+| `minSecondsBetweenPosts` | `3600` | Minimum gap between video posts. |
 | `maxVideoAgeHours` | `48` | Videos older than this are never queued. |
 | `excludeVerticalVideos` | `on` | `off` to keep vertical videos. Drops the duplicate Shorts the news channels post alongside each story. |
+| `eventsDigest` | `off` | `on` to post the daily events digest. |
+| `googleCalendarApiKey` | — | Google Cloud API key with the Google Calendar API enabled. Required when `eventsDigest` is on. May be the same key as `youtubeApiKey`. |
+| `eventsDigestHour` | `7` | Local (Central) hour, 0–23, from which the day's digest is posted. |
+
+`eventsDigest` is a string for the same reason as `dryRun`.
 
 There is no setting for which subreddit to post to. The app posts to the subreddit it is
 installed in, so it cannot post anywhere else.
@@ -111,6 +139,13 @@ An empty `keywords` array accepts every upload. A non-empty one accepts a video 
 its title or description contains one of the keywords, case-insensitively. Resolve a
 `@handle` to a channel ID with the YouTube Data API's `channels.list(forHandle=...)`.
 
+### Events calendar
+
+The calendar the digest reads is set by `EVENTS_CALENDAR_ID` in
+`src/server/eventsConfig.ts`. Like the channel list, it is checked in, not a setting. The
+digest refuses to run while it is empty. Creating and filling the calendar is covered in
+[`apps-script/README.md`](apps-script/README.md).
+
 `npm run check:filters` reports what the current configuration would queue right now,
 running the app's own fetching and filtering against live data. It labels each match as
 `TITLE` or `DESCRIPTION-ONLY`, which is how you catch a channel whose boilerplate
@@ -126,6 +161,13 @@ description footer matches a keyword on every single upload.
 5. Store it as a Devvit secret: `npx devvit settings set youtubeApiKey`.
 
 No billing account is required.
+
+For the events digest, also enable the **Google Calendar API** in the same project. Add
+it to the key's API restrictions, or create a second key restricted to it. Then run
+`npx devvit settings set googleCalendarApiKey`. The digest normally makes one Calendar
+API call a day; checks before it is due make none. A dry run never marks the day done,
+so it reads the calendar on every hourly check after the digest hour. That is still a
+negligible amount of quota.
 
 **Quota.** Each run costs about 2 units per channel — `channels.list` plus
 `playlistItems.list`, both cheap. `search.list`, which costs 100 units per call, is
@@ -145,9 +187,14 @@ The following domains are requested for this app:
 - `youtube.googleapis.com` — the official YouTube Data API v3. The app uses it to list
   recent uploads for the configured channels (`channels.list`, `playlistItems.list`) and
   to read the player dimensions of a candidate video, which is how it tells a vertical
-  Short from the horizontal original (`videos.list`). This is the app's only external
-  request. It was chosen over YouTube's RSS feeds, which are served from
-  `www.youtube.com`, so that every request goes to one documented API on one domain.
+  Short from the horizontal original (`videos.list`). It was chosen over YouTube's
+  RSS feeds, which are served from `www.youtube.com`, so that every YouTube request goes
+  to one documented API.
+- `www.googleapis.com` — the official Google Calendar API v3, used read-only to list
+  the current day's events on one public calendar for the daily events digest. Only
+  `GET /calendar/v3/calendars/{calendarId}/events` is called, with an API key. It is
+  normally called once a day, or hourly while `dryRun` is on. No OAuth and no user data
+  are involved. It is used only when a moderator turns the digest on.
 
 ## Notes for app review
 
@@ -160,7 +207,10 @@ The following domains are requested for this app:
   the source, as permitted by the YouTube Branding Guidelines. The app's name contains
   neither "YouTube" nor "YT".
 - **Stored data expires after 30 days**, matching YouTube's Developer Policies cap on
-  retaining non-authorized API data.
+  retaining non-authorized API data. The events digest stores no event data at all,
+  only the date of the last digest it posted.
+- **Event listings are used with permission** from bastropcountycalendar.com's owner,
+  and each event in a digest links back to its page there.
 - **Posting is rate-limited in the app itself**, independently of the check schedule —
   see the three rules above.
 
@@ -182,17 +232,25 @@ src/server/
 ├── application/
 │   ├── ports.ts                 VideoSource, VideoQueueStore, PostFormatter,
 │   │                            Publisher, VideoFilter
-│   └── checkAndPost.ts          CheckAndPostUseCase -- the only orchestration
+│   ├── checkAndPost.ts          CheckAndPostUseCase -- video ingest and posting
+│   ├── postDailyDigest.ts       PostDailyDigestUseCase -- one events digest a day
+│   └── localDay.ts              local-day bounds in a time zone, DST-safe
 ├── infrastructure/
 │   ├── youtubeDataApiSource.ts  YouTube Data API v3
 │   ├── redisVideoQueueStore.ts  Redis-backed queue, dedup, and time gate
-│   ├── redditPublisher.ts       wraps submitPost
+│   ├── googleCalendarEventSource.ts  Google Calendar API v3, public calendar
+│   ├── dailyDigestFormatter.ts  digest title and markdown body
+│   ├── redisDigestStore.ts      date of the last digest
+│   ├── redditPublisher.ts       wraps submitPost (link and text posts)
 │   ├── videoFilters.ts          AcceptAllFilter, KeywordFilter
 │   ├── filteredVideoSource.ts   VideoSource + VideoFilter -> VideoSource
 │   └── passthroughFormatter.ts  title and url, truncated to Reddit's limit
 ├── channelsConfig.ts            watched channels (checked in, not secret)
+├── eventsConfig.ts              events calendar id and time zone
 ├── config.ts                    settings and the target subreddit
-└── index.ts                     composition root and scheduler endpoint
+└── index.ts                     composition root and scheduler endpoints
+
+apps-script/                     Google Apps Script: site events -> public calendar
 ```
 
 `CheckAndPostUseCase.run()` does two things per tick:
@@ -203,11 +261,16 @@ src/server/
 2. **Post, time-gated** — if enough time has passed since the last post, take the oldest
    pending video and publish it. Otherwise do nothing.
 
+`PostDailyDigestUseCase.run()` is called hourly and is independent of the video flow. It
+works out the local date and hour in `America/Chicago`. If the digest is due and has not
+been posted today, it reads that local day's events (midnight to midnight, so DST days
+are 23 or 25 hours) and posts them as one text post.
+
 ## Development
 
 ```
 npm install
-npm test           # 48 unit tests
+npm test           # 129 unit tests
 npm run typecheck
 npm run build      # esbuild -> dist/server/index.cjs
 ```

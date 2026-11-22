@@ -1,4 +1,6 @@
+import type { CalendarEvent } from '../domain/calendarEvent.js';
 import type { Video } from '../domain/video.js';
+import type { LocalDay } from './localDay.js';
 
 export interface VideoSource {
   fetchLatest(): Promise<Video[]>;
@@ -29,4 +31,24 @@ export class PublishError extends Error {}
 
 export interface Publisher {
   submitLinkPost(subreddit: string, post: FormattedPost): Promise<string>;
+  submitTextPost(subreddit: string, post: FormattedTextPost): Promise<string>;
+}
+
+export interface EventSource {
+  fetchEventsBetween(start: Date, end: Date): Promise<CalendarEvent[]>;
+}
+
+export interface DigestStore {
+  /** `YYYY-MM-DD` of the last local day a digest was handled for, or null. */
+  lastDigestDate(): Promise<string | null>;
+  markDigestPosted(localDate: string): Promise<void>;
+}
+
+export interface FormattedTextPost {
+  readonly title: string;
+  readonly body: string;
+}
+
+export interface DigestFormatter {
+  format(day: LocalDay, events: readonly CalendarEvent[]): FormattedTextPost;
 }

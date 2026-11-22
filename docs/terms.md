@@ -1,10 +1,11 @@
 # Terms and Conditions — bastrop-news
 
-_Last updated: 2026-08-14_
+_Last updated: 2026-11-22_
 
 bastrop-news is a non-commercial Reddit app that watches a fixed set of YouTube channels
 and submits a link post to the subreddit it is installed in when a new, relevant video is
-published. By installing or using this app you agree to these terms.
+published. When moderators turn it on, it also posts a daily digest of local events. By
+installing or using this app you agree to these terms.
 
 ## YouTube
 
@@ -15,6 +16,16 @@ Google's handling of your information is described in the
 
 All video content the app links to is hosted by YouTube and belongs to the channel that
 published it. This app publishes no video content of its own; it links to the source.
+
+## Events
+
+The events digest reads a public Google Calendar through the Google Calendar API, under
+the [Google APIs Terms of Service](https://developers.google.com/terms). The calendar is
+filled from the public listings on
+[bastropcountycalendar.com](https://bastropcountycalendar.com), with the site owner's
+permission, and every event in a digest links back to its page there. Event details
+belong to their organizers; the app does not vouch for their accuracy, and dates, times,
+and venues should be confirmed with the organizer.
 
 ## What the app does
 
@@ -28,6 +39,10 @@ published it. This app publishes no video content of its own; it links to the so
   minimum interval apart regardless of how often the app checks.
 - Posts are plain link posts — the video's title, linking to the video — submitted under
   the app's own account.
+- When the events digest is on, once each morning it reads the day's events from the
+  public events calendar and submits one text post listing them: each event's title,
+  time, and venue, with a link to its page. It posts at most one digest per day, and
+  none on a day with no events.
 
 ## What the app does not do
 
@@ -37,8 +52,9 @@ published it. This app publishes no video content of its own; it links to the so
 - It does not vote, comment, message, or take moderation actions at all.
 - It does not post to any subreddit other than the one it is installed in.
 - It does not use Reddit or YouTube content to train any machine learning model.
-- It does not modify, summarize, or generate content. A post is the video's own title
-  and its URL.
+- It does not modify, summarize, or generate content. A video post is the video's own
+  title and its URL; a digest lists each event's title, time, and venue as the calendar
+  gives them.
 - It does not sell, share, or otherwise commercialize any data it touches.
 
 ## Moderator control
@@ -51,8 +67,9 @@ detect, resist, or re-create removed posts.
 ## Availability
 
 This app is provided as-is and without warranty, for community use. It may be modified,
-paused, or discontinued at any time. Availability also depends on the YouTube Data API
-and on Reddit's platform, neither of which this app controls.
+paused, or discontinued at any time. Availability also depends on the YouTube Data API,
+the Google Calendar API, bastropcountycalendar.com, and Reddit's platform, none of which
+this app controls.
 
 ## Contact
 

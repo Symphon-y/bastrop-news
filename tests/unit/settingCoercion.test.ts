@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asBoolean, asNumber } from '../../src/server/config.js';
+import { asBoolean, asHour, asNumber } from '../../src/server/config.js';
 
 describe('asBoolean', () => {
   it('passes real booleans through', () => {
@@ -48,5 +48,21 @@ describe('asNumber', () => {
     expect(asNumber('soon', 60)).toBe(60);
     expect(asNumber(Number.NaN, 60)).toBe(60);
     expect(asNumber(Number.POSITIVE_INFINITY, 60)).toBe(60);
+  });
+});
+
+describe('asHour', () => {
+  it('accepts whole hours 0-23, including as strings', () => {
+    expect(asHour('0', 7)).toBe(0);
+    expect(asHour(23, 7)).toBe(23);
+    expect(asHour(' 9 ', 7)).toBe(9);
+  });
+
+  it('falls back on anything that is not a clock hour', () => {
+    expect(asHour('24', 7)).toBe(7);
+    expect(asHour(-1, 7)).toBe(7);
+    expect(asHour('7.5', 7)).toBe(7);
+    expect(asHour('seven', 7)).toBe(7);
+    expect(asHour(undefined, 7)).toBe(7);
   });
 });

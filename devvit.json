@@ -10,7 +10,8 @@
     "http": {
       "enable": true,
       "domains": [
-        "youtube.googleapis.com"
+        "youtube.googleapis.com",
+        "www.googleapis.com"
       ]
     }
   },
@@ -30,6 +31,10 @@
       "check-and-post": {
         "endpoint": "/internal/scheduler/check-and-post",
         "cron": "*/15 * * * *"
+      },
+      "daily-events-digest": {
+        "endpoint": "/internal/scheduler/daily-events-digest",
+        "cron": "5 * * * *"
       }
     }
   },
@@ -64,6 +69,24 @@
         "label": "Exclude vertical videos -- \"on\" or \"off\"",
         "helpText": "\"on\" (default) drops vertically-oriented uploads from the TV news channels, which publish the same story twice -- once horizontal, once as a vertical Short -- so the subreddit gets it twice. Costs at most one extra YouTube API unit per news channel per run, and only for videos that already passed the keyword filter. Videos whose orientation cannot be determined are kept. Deliberately a string, not a boolean: `devvit settings set` transmits values as strings and the server coerces them, so a boolean field can never be set to false from the CLI. Anything unrecognised is treated as \"on\".",
         "defaultValue": "on"
+      },
+      "eventsDigest": {
+        "type": "string",
+        "label": "Daily events digest -- \"on\" or \"off\"",
+        "helpText": "\"on\" posts one \"Happening today\" digest each morning from the public events calendar. Defaults to \"off\". A string for the same reason as dryRun, which also applies to the digest.",
+        "defaultValue": "off"
+      },
+      "googleCalendarApiKey": {
+        "type": "string",
+        "label": "Google Calendar API key",
+        "helpText": "A Google Cloud API key with the Google Calendar API enabled, used read-only against a public calendar. Required only when the events digest is on. May be the same key as youtubeApiKey if that key's API restrictions include both APIs. Set via `devvit settings set googleCalendarApiKey`.",
+        "isSecret": true
+      },
+      "eventsDigestHour": {
+        "type": "number",
+        "label": "Events digest hour (0-23, Central time)",
+        "helpText": "The digest is posted on the first hourly check at or after this local hour.",
+        "defaultValue": 7
       }
     }
   },

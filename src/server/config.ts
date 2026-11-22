@@ -71,3 +71,37 @@ export async function loadConfig(): Promise<AppConfig> {
 
   return { youtubeApiKey, minSecondsBetweenPosts, maxVideoAgeHours, dryRun, excludeVerticalVideos };
 }
+
+export interface EventsConfig {
+  enabled: boolean;
+  /** Empty when the digest is disabled; required otherwise. */
+  googleCalendarApiKey: string;
+  /** Local hour (0-23) from which the day's digest is due. */
+  digestHour: number;
+  dryRun: boolean;
+}
+
+const DEFAULT_EVENTS_DIGEST_ENABLED = false;
+const DEFAULT_EVENTS_DIGEST_HOUR = 7;
+
+export function asHour(value: unknown, fallback: number): number {
+  const hour = asNumber(value, fallback);
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : fallback;
+}
+
+/** Separate from loadConfig so the digest does not depend on the YouTube key. */
+export async function loadEventsConfig(): Promise<EventsConfig> {
+  const enabled = asBoolean(await settings.get('eventsDigest'), DEFAULT_EVENTS_DIGEST_ENABLED);
+  const dryRun = asBoolean(await settings.get('dryRun'), DEFAULT_DRY_RUN);
+  const digestHour = asHour(await settings.get('eventsDigestHour'), DEFAULT_EVENTS_DIGEST_HOUR);
+  if (!enabled) {
+    return { enabled, googleCalendarApiKey: '', digestHour, dryRun };
+  }
+  const googleCalendarApiKey = await settings.get<string>('googleCalendarApiKey');
+  if (!googleCalendarApiKey) {
+    throw new Error(
+      'googleCalendarApiKey setting is not configured -- run `devvit settings set googleCalendarApiKey`',
+    );
+  }
+  return { enabled, googleCalendarApiKey, digestHour, dryRun };
+}

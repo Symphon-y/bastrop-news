@@ -1,7 +1,8 @@
 # bastrop-news
 
 A [Devvit](https://developers.reddit.com/docs) app that watches a fixed list of YouTube
-channels and posts new videos to the subreddit it is installed in. Built for
+channels and posts new videos to the subreddit it is installed in, and optionally posts a
+daily digest of local events read from a public Google Calendar. Built for
 **r/BastropTX**; playtested against **r/bastrop_test**. It runs on Reddit's
 infrastructure — there is no server, container, or host machine involved.
 
@@ -20,9 +21,12 @@ src/server/
 ├── application/
 │   ├── ports.ts                 VideoSource, VideoQueueStore, PostFormatter,
 │   │                            Publisher, VideoFilter
-│   └── checkAndPost.ts          CheckAndPostUseCase -- the only orchestration
+│   ├── checkAndPost.ts          CheckAndPostUseCase -- video ingest and posting
+│   ├── postDailyDigest.ts       PostDailyDigestUseCase -- one events digest a day
+│   └── localDay.ts              local-day bounds in a time zone, DST-safe
 ├── infrastructure/              one adapter per port
 ├── channelsConfig.ts            watched channels (checked in, not secret)
+├── eventsConfig.ts              events calendar id and time zone (checked in)
 ├── config.ts                    settings, coercion, target subreddit
 └── index.ts                     composition root / scheduler endpoint
 ```
@@ -32,11 +36,19 @@ inside the age window) then posts under a time gate (if enough time has passed, 
 the oldest pending video). `dryRun` suppresses publishing, marking posted, and advancing
 the gate, while leaving ingest intact.
 
+`PostDailyDigestUseCase.run()` runs from an hourly cron but posts at most once per local
+(`America/Chicago`) day. Being due is decided in code, not by the cron, so the post
+stays at the same local hour across DST and a failure retries an hour later.
+`apps-script/` is a separate Google Apps Script that fills the calendar from
+bastropcountycalendar.com. It is never uploaded to Reddit; see its README.
+
 ## Testing
 
-`npm test` — 63 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
+`npm test` — 129 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
 Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
 constructor injection and are tested against in-memory fakes in `tests/fakes/`.
+`apps-script/Labels.js` and `Parse.js` are plain Apps Script (global declarations, no
+modules). Their test evaluates them in a `node:vm` sandbox with a stub `Utilities`.
 
 `npm run typecheck`, `npm run build` (esbuild → `dist/server/index.cjs`). `devvit.json`
 can be validated against `node_modules/@devvit/shared-types/schemas/config-file.v1.json`.
@@ -77,6 +89,21 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   cannot be driven from a non-interactive shell. The zip respects `.gitignore` -- which
   is what keeps the dotenv files out of it, and why an untracked scratch file in the
   working tree ships to reviewers.
+- **Devvit cron is UTC; Central time lives in the use case.** Do not "fix" the digest
+  to a daily cron at 13:00 UTC: it would drift an hour at every DST change.
+- **The events source has messy dates.** `bastropcountycalendar.com/api/events` returns
+  naive local datetimes, date-only or missing ends on timed events, and a few garbage
+  starts (`"January 1, 1863T00:00:00"`). `apps-script/Parse.js` normalizes them; its
+  tests use those real shapes.
+- **Calendar event labels need `eventLabelVersion=1` on every event write**, or
+  `eventLabelId` is ignored. On a labelled write, omitting `eventLabelId` clears the
+  label, so patches always send it. The sync calls the REST API through
+  `calendarRequest` in `apps-script/Sync.js` rather than the Advanced Calendar service,
+  whose client may predate labels. Category to label matching lives in
+  `apps-script/Labels.js`.
+- **Deleting an event in the calendar suppresses it.** The sync uses deterministic ids
+  (`bcc` + SHA-256 of the source id) and never recreates a cancelled one. That is the
+  moderator's way to keep a listing out of the digest.
 
 ## Constraints that come from policy, not preference
 
