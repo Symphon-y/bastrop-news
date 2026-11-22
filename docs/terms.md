@@ -35,6 +35,11 @@ and venues should be confirmed with the organizer.
 - Videos published longer ago than a configured age window are ignored.
 - For channels configured with keyword filters, a video is considered only if its title
   or description contains a matching keyword.
+- The TV news channels often publish each story twice, once as a horizontal video and
+  once as a vertical Short. For those channels the vertical copy is skipped, judged from
+  the video player's dimensions, so the story is posted once. A video whose orientation
+  cannot be determined is kept. Moderators can turn this off with the
+  `excludeVerticalVideos` setting.
 - At most one video is posted per check, and posts are spaced at least a configured
   minimum interval apart regardless of how often the app checks.
 - Posts are plain link posts — the video's title, linking to the video — submitted under

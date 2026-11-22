@@ -20,6 +20,10 @@ same Google Privacy Policy.
 - **Public YouTube video metadata** — video ID, title, description, publish date, and
   URL — for uploads on a small, fixed list of channels, retrieved through the YouTube
   Data API v3. This is information those channels have already published publicly.
+- **Public YouTube player dimensions** — the width and height of a video's embedded
+  player — for videos from the TV news channels that have already passed the keyword
+  filter. They are used only to tell a vertical Short from the horizontal original of
+  the same story, and are discarded once that is decided; they are never stored.
 - **Public calendar events** (title, start and end time, venue, and a link to the
   event's page) for the current day, read from a public Google Calendar through the
   Google Calendar API v3. That calendar is filled from the public listings on
@@ -56,8 +60,9 @@ and which one to post next. It is not shared with anyone. No data is sold, and n
 used to train machine learning models.
 
 The app makes two kinds of external request: to `youtube.googleapis.com`, to list
-recent uploads for the configured channels, and to `www.googleapis.com`, to read the
-day's events from the public events calendar. Nothing about any redditor is included in
+recent uploads for the configured channels and to read the player dimensions of
+candidate news videos, and to `www.googleapis.com`, to read the day's events from the
+public events calendar. Nothing about any redditor is included in
 those requests, because the app never has such information.
 
 No third party serves content or advertisements through this app.

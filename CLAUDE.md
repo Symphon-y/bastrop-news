@@ -17,7 +17,9 @@ Ports and adapters:
 
 ```
 src/server/
-├── domain/video.ts              Video -- the one domain type
+├── domain/
+│   ├── video.ts                 Video
+│   └── calendarEvent.ts         CalendarEvent
 ├── application/
 │   ├── ports.ts                 VideoSource, VideoQueueStore, PostFormatter,
 │   │                            Publisher, VideoFilter
@@ -101,6 +103,14 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   `calendarRequest` in `apps-script/Sync.js` rather than the Advanced Calendar service,
   whose client may predate labels. Category to label matching lives in
   `apps-script/Labels.js`.
+- **`clasp create` overwrites `apps-script/appsscript.json`** with Google's default
+  manifest (New York time zone, no scopes), and **`clasp push` silently prints
+  `Skipping push.`** when the manifest changed, unless given `--force`. Always
+  `npx @google/clasp push --force`, and restore the manifest after any `create`.
+- **The Advanced Calendar service must stay in `appsscript.json`** even though the code
+  calls the REST API directly. Declaring it is what enables the Calendar API on the
+  script's hidden default Cloud project; remove it and every call fails with
+  `HTTP 403 -- Google Calendar API has not been used in project …`.
 - **Deleting an event in the calendar suppresses it.** The sync uses deterministic ids
   (`bcc` + SHA-256 of the source id) and never recreates a cancelled one. That is the
   moderator's way to keep a listing out of the digest.

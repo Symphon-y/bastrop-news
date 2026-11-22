@@ -201,8 +201,14 @@ The following domains are requested for this app:
 - **Posts are attributed to the app account** (`runAs: 'APP'` in
   `src/server/infrastructure/redditPublisher.ts`). The app does not take actions on
   behalf of any redditor, and requests no such permission.
-- **The app reads no Reddit user data.** It reads public YouTube metadata and writes
-  link posts. It does not read profiles, comments, votes, or messages.
+- **The app reads no Reddit user data.** It reads public YouTube metadata and, when the
+  digest is on, public calendar events. It writes link posts and at most one daily text
+  post. It does not read profiles, comments, votes, or messages.
+- **`apps-script/` is not part of the Reddit app.** It is a separate Google Apps Script
+  that runs under the calendar owner's Google account, on Google's infrastructure, and
+  fills the public calendar the digest reads. It is not in the Devvit bundle and makes
+  no requests from Reddit. It is included so the source of the calendar data can be
+  reviewed.
 - **YouTube brand usage** is limited to linking to YouTube videos and naming YouTube as
   the source, as permitted by the YouTube Branding Guidelines. The app's name contains
   neither "YouTube" nor "YT".
@@ -228,7 +234,9 @@ no network and no Devvit runtime required.
 
 ```
 src/server/
-├── domain/video.ts              Video -- the one domain type
+├── domain/
+│   ├── video.ts                 Video
+│   └── calendarEvent.ts         CalendarEvent
 ├── application/
 │   ├── ports.ts                 VideoSource, VideoQueueStore, PostFormatter,
 │   │                            Publisher, VideoFilter
@@ -237,12 +245,13 @@ src/server/
 │   └── localDay.ts              local-day bounds in a time zone, DST-safe
 ├── infrastructure/
 │   ├── youtubeDataApiSource.ts  YouTube Data API v3
+│   ├── aspectRatioVideoSource.ts  adds player aspect ratios (videos.list)
 │   ├── redisVideoQueueStore.ts  Redis-backed queue, dedup, and time gate
 │   ├── googleCalendarEventSource.ts  Google Calendar API v3, public calendar
 │   ├── dailyDigestFormatter.ts  digest title and markdown body
 │   ├── redisDigestStore.ts      date of the last digest
 │   ├── redditPublisher.ts       wraps submitPost (link and text posts)
-│   ├── videoFilters.ts          AcceptAllFilter, KeywordFilter
+│   ├── videoFilters.ts          AcceptAllFilter, KeywordFilter, LandscapeOnlyFilter
 │   ├── filteredVideoSource.ts   VideoSource + VideoFilter -> VideoSource
 │   └── passthroughFormatter.ts  title and url, truncated to Reddit's limit
 ├── channelsConfig.ts            watched channels (checked in, not secret)
@@ -251,6 +260,9 @@ src/server/
 └── index.ts                     composition root and scheduler endpoints
 
 apps-script/                     Google Apps Script: site events -> public calendar
+├── Labels.js                    categories and label matching
+├── Parse.js                     source record normalisation
+└── Sync.js                      daily sync and Calendar API calls
 ```
 
 `CheckAndPostUseCase.run()` does two things per tick:
@@ -286,10 +298,28 @@ Run every `devvit` command from the repository root.
 ```
 npx devvit login
 npm run build
-npx devvit upload
+npx devvit upload                                   # prints the new version
+npx devvit install <test subreddit> bastrop-news@<version>
 npx devvit settings set youtubeApiKey
-npx devvit playtest <a test subreddit you moderate>
+npx devvit settings set googleCalendarApiKey        # events digest only
+npx devvit settings set eventsDigest                # "on" to enable it
 ```
+
+`devvit upload` updates no install, and `devvit settings set` only accepts keys declared
+by a version that is actually installed somewhere. A newly added setting therefore
+cannot be set until the version that declares it is installed. `npx devvit playtest
+<subreddit>` is the alternative to installing while iterating.
+
+The Apps Script that fills the events calendar deploys separately, with
+[clasp](https://github.com/google/clasp), from the repository root:
+
+```
+npx @google/clasp login
+npx @google/clasp push --force       # .clasp.json points at the script project
+```
+
+Setup, scheduling, and the calendar itself are covered in
+[`apps-script/README.md`](apps-script/README.md).
 
 An uploaded but unpublished app is visible only to its owner and installable only to
 subreddits with fewer than 200 subscribers. Installing anywhere larger requires

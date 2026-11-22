@@ -86,7 +86,8 @@ next morning.
    - Copy the **Calendar ID** from *Integrate calendar*. It looks like `…@group.calendar.google.com`.
    - Use this calendar only for the sync: the script treats every event whose id starts with `bcc` as its own.
 2. **Create the script project** at [script.google.com](https://script.google.com), signed in as the calendar's owner.
-   - **With [clasp](https://github.com/google/clasp):** run `clasp create --type standalone --rootDir apps-script` from the repository root, then `clasp push`.
+   - **With [clasp](https://github.com/google/clasp):** the project already exists, and `.clasp.json` at the repository root points at it. From the root, run `npx @google/clasp login`, then `npx @google/clasp push --force`. `--force` is needed whenever the manifest changed; without it clasp prints `Skipping push.`
+     - To start a fresh project instead, run `npx @google/clasp create-script --type standalone --title "Bastrop County Events Sync" --rootDir apps-script`. Then restore `apps-script/appsscript.json` from git, because `create-script` overwrites it with Google's default, and push with `--force`.
    - **Or by hand:** create three script files named `Labels`, `Parse` and `Sync`, and paste in `Labels.js`, `Parse.js` and `Sync.js`. Turn on *Show "appsscript.json"* in Project Settings and paste in `appsscript.json`.
      - The manifest lists the **Google Calendar API** advanced service. The code calls the REST API directly, but declaring the service is what turns the Calendar API on for the script's Cloud project. Without it every call fails with `HTTP 403 -- Google Calendar API has not been used in project …`.
 3. **Set the calendar ID:** *Project Settings* → *Script properties* → add `CALENDAR_ID` = the ID from step 1.
