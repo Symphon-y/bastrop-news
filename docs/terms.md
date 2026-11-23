@@ -50,8 +50,9 @@ and venues should be confirmed with the organizer.
   events from the public events calendar and submits one text post listing them: each
   event's title, time, and venue, with a link to its page. It posts at most one digest
   per day, and none on a day with no events today.
-- When moderators turn on pinning, the app pins each day's digest and unpins the
-  previous day's. It never pins or unpins any other post.
+- When moderators turn on highlighting, the app adds each day's digest to the
+  subreddit's Community Highlights and removes the previous day's. It never highlights
+  or removes any other post.
 
 ## What the app does not do
 

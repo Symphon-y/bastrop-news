@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { PublishError } from '../../src/server/application/ports.js';
 import { RedditPublisher } from '../../src/server/infrastructure/redditPublisher.js';
 
-type PinnablePost = { sticky(): Promise<void>; unsticky(): Promise<void> };
+type HighlightablePost = { highlight(options?: object): Promise<void>; unhighlight(): Promise<void> };
 
-function clientWith(post: PinnablePost | Error) {
+function clientWith(post: HighlightablePost | Error) {
   return {
     submitPost: vi.fn(),
-    getPostById: vi.fn(async (): Promise<PinnablePost> => {
+    getPostById: vi.fn(async (): Promise<HighlightablePost> => {
       if (post instanceof Error) throw post;
       return post;
     }),
@@ -65,28 +65,29 @@ describe('RedditPublisher', () => {
     );
   });
 
-  it('pins a post by stickying it', async () => {
-    const post = { sticky: vi.fn().mockResolvedValue(undefined), unsticky: vi.fn() };
+  it('adds a post to community highlights as an event, until the given time', async () => {
+    const post = { highlight: vi.fn().mockResolvedValue(undefined), unhighlight: vi.fn() };
     const client = clientWith(post);
+    const until = new Date('2026-11-24T15:00:00Z');
 
-    await new RedditPublisher(client).pin('t3_digest');
+    await new RedditPublisher(client).highlight('t3_digest', until);
 
     expect(client.getPostById).toHaveBeenCalledWith('t3_digest');
-    expect(post.sticky).toHaveBeenCalledWith();
+    expect(post.highlight).toHaveBeenCalledWith({ highlightUntil: until, highlightLabelType: 'EVENT' });
   });
 
-  it('unpins a post by unstickying it', async () => {
-    const post = { sticky: vi.fn(), unsticky: vi.fn().mockResolvedValue(undefined) };
+  it('removes a post from community highlights', async () => {
+    const post = { highlight: vi.fn(), unhighlight: vi.fn().mockResolvedValue(undefined) };
 
-    await new RedditPublisher(clientWith(post)).unpin('t3_digest');
+    await new RedditPublisher(clientWith(post)).unhighlight('t3_digest');
 
-    expect(post.unsticky).toHaveBeenCalled();
+    expect(post.unhighlight).toHaveBeenCalled();
   });
 
-  it('translates pin and unpin failures into PublishError', async () => {
+  it('translates highlight failures into PublishError', async () => {
     const publisher = new RedditPublisher(clientWith(new Error('not a moderator')));
 
-    await expect(publisher.pin('t3_digest')).rejects.toThrow(PublishError);
-    await expect(publisher.unpin('t3_digest')).rejects.toThrow(PublishError);
+    await expect(publisher.highlight('t3_digest', new Date())).rejects.toThrow(PublishError);
+    await expect(publisher.unhighlight('t3_digest')).rejects.toThrow(PublishError);
   });
 });

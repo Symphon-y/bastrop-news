@@ -47,8 +47,8 @@ URL, publish date, and whether that video has been posted. This exists for two r
 only — to avoid posting the same video twice, and to pace how often the app posts.
 
 For the events digest it keeps only the date of the last digest it posted, so it posts
-once a day, and, when moderators turn on pinning, the Reddit id of the digest post it
-pinned, so it can unpin it the next day. **Event details are not stored**; they are read from the calendar when the
+once a day, and, when moderators turn on highlighting, the Reddit id of the digest post
+it added to Community Highlights, so it can remove it the next day. **Event details are not stored**; they are read from the calendar when the
 digest is written and used only to write it.
 
 **No personal information is stored.** No information about any redditor, viewer, or
@@ -76,7 +76,8 @@ The app submits link posts — a video's title, linking to that video on YouTube
 subreddit it is installed in, under the app's own account. When the events digest is
 on, it also submits one text post a day listing that day's and the next day's events,
 with links to each event's page on its source's site. When moderators turn on
-pinning, it also pins that post and unpins the previous day's. Those posts are the only things it writes
+highlighting, it also adds that post to Community Highlights and removes the previous
+day's. Those posts are the only things it writes
 anywhere.
 
 Video posts link to YouTube. Once someone follows such a link they are on YouTube, and

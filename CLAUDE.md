@@ -43,9 +43,9 @@ the gate, while leaving ingest intact.
 (`America/Chicago`) day. Being due is decided in code, not by the cron, so the post
 stays at the same local hour across DST and a failure retries an hour later. It fetches
 today and tomorrow in one call; `buildDailyDigest` (pure) decides which section each
-event belongs to, and `DailyDigestFormatter` only renders. Pinning is a separate
-`PostPinner` port, optional, and runs after the day is marked so a pin failure can
-never cause a second post.
+event belongs to, and `DailyDigestFormatter` only renders. Community Highlights are a
+separate `PostHighlighter` port, optional, and run after the day is marked so a
+highlight failure can never cause a second post.
 `apps-script/` is a separate Google Apps Script that fills the calendar from two
 sources: bastropcountycalendar.com (an aggregator of 25+ calendars) and the City of
 Bastrop's Community Calendar, which the aggregator does not carry. It is never uploaded
@@ -53,7 +53,7 @@ to Reddit; see its README.
 
 ## Testing
 
-`npm test` — 227 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
+`npm test` — 228 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
 Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
 constructor injection and are tested against in-memory fakes in `tests/fakes/`.
 `apps-script/*.js` are plain Apps Script (global declarations, no modules).
@@ -148,9 +148,11 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
 - **"Multi-day" means longer than 25 hours**, not "ends on a different date". That
   threshold keeps an all-day event on the 25-hour fall-back day and an 8 PM–1 AM show
   single-day, so neither gets a "through" date.
-- **Sticky needs the `moderator` Reddit scope** in `devvit.json`; the default `user`
-  scope cannot pin. Changing the scope may make moderators re-approve the app's
-  permissions on upgrade.
+- **Sticky posts are now Community Highlights.** Use `post.highlight()` /
+  `unhighlight()` (Devvit 0.15+), not `sticky()`: highlights hold six posts, take a label
+  (`EVENT` here) and an expiry (`highlightUntil`), while `sticky()` only reaches the two
+  legacy slots. The expiry is the backstop that clears a stale digest if the next day's
+  run fails. Both need the `moderator` Reddit scope in `devvit.json`.
 - **Deleting an event in the calendar suppresses it.** The sync uses deterministic ids
   (`bcc` + SHA-256 of the source id) and never recreates a cancelled one. That is the
   moderator's way to keep a listing out of the digest.

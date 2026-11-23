@@ -42,15 +42,19 @@ export interface DigestStore {
   /** `YYYY-MM-DD` of the last local day a digest was handled for, or null. */
   lastDigestDate(): Promise<string | null>;
   markDigestPosted(localDate: string): Promise<void>;
-  /** The digest post currently pinned by the app, so the next one can replace it. */
-  pinnedPostId(): Promise<string | null>;
-  setPinnedPostId(postId: string | null): Promise<void>;
+  /** The digest post the app last added to community highlights, so the next replaces it. */
+  highlightedPostId(): Promise<string | null>;
+  setHighlightedPostId(postId: string | null): Promise<void>;
 }
 
-/** Kept apart from Publisher: pinning is optional and needs moderator permission. */
-export interface PostPinner {
-  pin(postId: string): Promise<void>;
-  unpin(postId: string): Promise<void>;
+/**
+ * Reddit's community highlights (formerly sticky posts). Kept apart from Publisher:
+ * highlighting is optional and needs moderator permission.
+ */
+export interface PostHighlighter {
+  /** Highlights the post until `until`, when Reddit removes it by itself. */
+  highlight(postId: string, until: Date): Promise<void>;
+  unhighlight(postId: string): Promise<void>;
 }
 
 export interface FormattedTextPost {

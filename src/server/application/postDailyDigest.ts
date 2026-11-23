@@ -6,9 +6,17 @@ import {
   type DigestStore,
   type EventSource,
   type FormattedTextPost,
-  type PostPinner,
+  type PostHighlighter,
   type Publisher,
 } from './ports.js';
+
+const HOUR_MS = 60 * 60 * 1000;
+/**
+ * A digest's highlight expires this long after the next digest is due. Normally the
+ * next digest unhighlights it first; the expiry is the backstop if that run fails, so
+ * a stale digest never stays featured for more than a couple of hours past its day.
+ */
+const HIGHLIGHT_GRACE_HOURS = 2;
 
 export type DigestStatus =
   | 'posted'
@@ -24,8 +32,8 @@ export interface DigestRunResult {
   /** Events today, including ongoing ones; tomorrow's preview is not counted. */
   readonly eventCount: number;
   readonly wouldPost?: FormattedTextPost;
-  /** Set only when a pinner is configured and a digest was posted. */
-  readonly pinned?: boolean;
+  /** Set only when a highlighter is configured and a digest was posted. */
+  readonly highlighted?: boolean;
 }
 
 export interface PostDailyDigestUseCaseOptions {
@@ -33,8 +41,8 @@ export interface PostDailyDigestUseCaseOptions {
   digestStore: DigestStore;
   formatter: DigestFormatter;
   publisher: Publisher;
-  /** When set, each new digest replaces the previous one as a sticky post. */
-  pinner?: PostPinner;
+  /** When set, each new digest replaces the previous one in community highlights. */
+  highlighter?: PostHighlighter;
   subreddit: string;
   timeZone: string;
   /** Local hour (0-23) from which the day's digest is due. */
@@ -58,7 +66,7 @@ export class PostDailyDigestUseCase {
       digestStore,
       formatter,
       publisher,
-      pinner,
+      highlighter,
       subreddit,
       timeZone,
       digestHour,
@@ -100,29 +108,30 @@ export class PostDailyDigestUseCase {
       throw error;
     }
 
-    // Marked before pinning: a pin failure must not cause the next run to post again.
+    // Marked before highlighting: a highlight failure must not cause the next run to post again.
     await digestStore.markDigestPosted(day.localDate);
-    if (!pinner) return { ...base, status: 'posted', eventCount };
-    return { ...base, status: 'posted', eventCount, pinned: await this.pin(pinner, postId) };
+    if (!highlighter) return { ...base, status: 'posted', eventCount };
+    const until = new Date(tomorrow.start.getTime() + (digestHour + HIGHLIGHT_GRACE_HOURS) * HOUR_MS);
+    return { ...base, status: 'posted', eventCount, highlighted: await this.highlight(highlighter, postId, until) };
   }
 
-  /** Replaces the previous digest's sticky with this one. Never throws. */
-  private async pin(pinner: PostPinner, postId: string): Promise<boolean> {
+  /** Replaces the previous digest in community highlights with this one. Never throws. */
+  private async highlight(highlighter: PostHighlighter, postId: string, until: Date): Promise<boolean> {
     const { digestStore } = this.options;
-    const previous = await digestStore.pinnedPostId();
+    const previous = await digestStore.highlightedPostId();
     if (previous) {
-      // A deleted or already-unpinned post fails here; the new pin should still go ahead.
-      await pinner.unpin(previous).catch((error: unknown) => {
-        console.warn(`could not unpin previous digest ${previous}:`, error);
+      // A deleted or expired highlight fails or no-ops here; the new one should still go ahead.
+      await highlighter.unhighlight(previous).catch((error: unknown) => {
+        console.warn(`could not unhighlight previous digest ${previous}:`, error);
       });
     }
     try {
-      await pinner.pin(postId);
-      await digestStore.setPinnedPostId(postId);
+      await highlighter.highlight(postId, until);
+      await digestStore.setHighlightedPostId(postId);
       return true;
     } catch (error) {
-      console.warn(`could not pin digest ${postId}:`, error);
-      await digestStore.setPinnedPostId(null);
+      console.warn(`could not highlight digest ${postId}:`, error);
+      await digestStore.setHighlightedPostId(null);
       return false;
     }
   }

@@ -3,7 +3,7 @@ import type { DigestStore } from '../../src/server/application/ports.js';
 export class FakeDigestStore implements DigestStore {
   constructor(
     public lastDate: string | null = null,
-    public pinnedId: string | null = null,
+    public highlightedId: string | null = null,
   ) {}
 
   async lastDigestDate(): Promise<string | null> {
@@ -14,11 +14,11 @@ export class FakeDigestStore implements DigestStore {
     this.lastDate = localDate;
   }
 
-  async pinnedPostId(): Promise<string | null> {
-    return this.pinnedId;
+  async highlightedPostId(): Promise<string | null> {
+    return this.highlightedId;
   }
 
-  async setPinnedPostId(postId: string | null): Promise<void> {
-    this.pinnedId = postId;
+  async setHighlightedPostId(postId: string | null): Promise<void> {
+    this.highlightedId = postId;
   }
 }

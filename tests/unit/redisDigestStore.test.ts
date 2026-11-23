@@ -11,13 +11,13 @@ describe('RedisDigestStore', () => {
     expect(await store.lastDigestDate()).toBe('2026-11-22');
   });
 
-  it('remembers the pinned digest post, and forgets it when cleared', async () => {
+  it('remembers the highlighted digest post, and forgets it when cleared', async () => {
     const store = new RedisDigestStore(new FakeRedis());
 
-    expect(await store.pinnedPostId()).toBeNull();
-    await store.setPinnedPostId('t3_digest');
-    expect(await store.pinnedPostId()).toBe('t3_digest');
-    await store.setPinnedPostId(null);
-    expect(await store.pinnedPostId()).toBeNull();
+    expect(await store.highlightedPostId()).toBeNull();
+    await store.setHighlightedPostId('t3_digest');
+    expect(await store.highlightedPostId()).toBe('t3_digest');
+    await store.setHighlightedPostId(null);
+    expect(await store.highlightedPostId()).toBeNull();
   });
 });

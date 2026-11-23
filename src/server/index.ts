@@ -100,7 +100,7 @@ app.post('/internal/scheduler/daily-events-digest', async (_req, res) => {
       digestStore: new RedisDigestStore(redis),
       formatter: new DailyDigestFormatter(EVENTS_TIME_ZONE, publicCalendarUrl(EVENTS_CALENDAR_ID)),
       publisher,
-      pinner: config.sticky ? publisher : undefined,
+      highlighter: config.highlight ? publisher : undefined,
       subreddit: targetSubreddit,
       timeZone: EVENTS_TIME_ZONE,
       digestHour: config.digestHour,
@@ -116,14 +116,14 @@ app.post('/internal/scheduler/daily-events-digest', async (_req, res) => {
       console.log(
         `daily-events-digest ${result.localDate}: ${result.status} -> r/${targetSubreddit}` +
           `${config.dryRun ? ' (DRY RUN -- nothing posted)' : ''}`,
-        { eventCount: result.eventCount, pinned: result.pinned },
+        { eventCount: result.eventCount, highlighted: result.highlighted },
       );
     }
     res.json({
       localDate: result.localDate,
       status: result.status,
       eventCount: result.eventCount,
-      pinned: result.pinned,
+      highlighted: result.highlighted,
     });
   } catch (error) {
     console.error('daily-events-digest run failed', error);

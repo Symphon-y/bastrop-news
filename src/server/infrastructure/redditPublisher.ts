@@ -2,7 +2,7 @@ import {
   PublishError,
   type FormattedPost,
   type FormattedTextPost,
-  type PostPinner,
+  type PostHighlighter,
   type Publisher,
 } from '../application/ports.js';
 
@@ -18,10 +18,16 @@ export interface RedditClientLike {
       runAs?: 'USER' | 'APP';
     } & ({ url: string } | { text: string }),
   ): Promise<{ id: string }>;
-  getPostById(id: PostId): Promise<{ sticky(): Promise<void>; unsticky(): Promise<void> }>;
+  getPostById(id: PostId): Promise<HighlightablePost>;
 }
 
-export class RedditPublisher implements Publisher, PostPinner {
+/** The slice of @devvit/reddit's Post used for community highlights. */
+interface HighlightablePost {
+  highlight(options?: { highlightUntil?: Date; highlightLabelType?: 'EVENT' }): Promise<void>;
+  unhighlight(): Promise<void>;
+}
+
+export class RedditPublisher implements Publisher, PostHighlighter {
   constructor(private readonly reddit: RedditClientLike) {}
 
   async submitLinkPost(subreddit: string, post: FormattedPost): Promise<string> {
@@ -51,19 +57,24 @@ export class RedditPublisher implements Publisher, PostPinner {
     }
   }
 
-  /** Uses the next free sticky slot, or the bottom one when both are taken. */
-  async pin(postId: string): Promise<void> {
-    await this.moderate(postId, 'pin', (post) => post.sticky());
+  /**
+   * Community highlights replaced sticky posts: up to six per subreddit, each with a
+   * label and an optional expiry. The digest is labelled an event.
+   */
+  async highlight(postId: string, until: Date): Promise<void> {
+    await this.moderate(postId, 'highlight', (post) =>
+      post.highlight({ highlightUntil: until, highlightLabelType: 'EVENT' }),
+    );
   }
 
-  async unpin(postId: string): Promise<void> {
-    await this.moderate(postId, 'unpin', (post) => post.unsticky());
+  async unhighlight(postId: string): Promise<void> {
+    await this.moderate(postId, 'unhighlight', (post) => post.unhighlight());
   }
 
   private async moderate(
     postId: string,
     action: string,
-    apply: (post: { sticky(): Promise<void>; unsticky(): Promise<void> }) => Promise<void>,
+    apply: (post: HighlightablePost) => Promise<void>,
   ): Promise<void> {
     try {
       await apply(await this.reddit.getPostById(postId as PostId));

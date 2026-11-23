@@ -79,12 +79,12 @@ export interface EventsConfig {
   /** Local hour (0-23) from which the day's digest is due. */
   digestHour: number;
   dryRun: boolean;
-  /** Pin each digest in place of the previous one. */
-  sticky: boolean;
+  /** Add each digest to community highlights in place of the previous one. */
+  highlight: boolean;
 }
 
 const DEFAULT_EVENTS_DIGEST_ENABLED = false;
-const DEFAULT_STICKY_DIGEST = false;
+const DEFAULT_HIGHLIGHT_DIGEST = false;
 const DEFAULT_EVENTS_DIGEST_HOUR = 7;
 
 export function asHour(value: unknown, fallback: number): number {
@@ -97,9 +97,9 @@ export async function loadEventsConfig(): Promise<EventsConfig> {
   const enabled = asBoolean(await settings.get('eventsDigest'), DEFAULT_EVENTS_DIGEST_ENABLED);
   const dryRun = asBoolean(await settings.get('dryRun'), DEFAULT_DRY_RUN);
   const digestHour = asHour(await settings.get('eventsDigestHour'), DEFAULT_EVENTS_DIGEST_HOUR);
-  const sticky = asBoolean(await settings.get('stickyDigest'), DEFAULT_STICKY_DIGEST);
+  const highlight = asBoolean(await settings.get('highlightDigest'), DEFAULT_HIGHLIGHT_DIGEST);
   if (!enabled) {
-    return { enabled, googleCalendarApiKey: '', digestHour, dryRun, sticky };
+    return { enabled, googleCalendarApiKey: '', digestHour, dryRun, highlight };
   }
   const googleCalendarApiKey = await settings.get<string>('googleCalendarApiKey');
   if (!googleCalendarApiKey) {
@@ -107,5 +107,5 @@ export async function loadEventsConfig(): Promise<EventsConfig> {
       'googleCalendarApiKey setting is not configured -- run `devvit settings set googleCalendarApiKey`',
     );
   }
-  return { enabled, googleCalendarApiKey, digestHour, dryRun, sticky };
+  return { enabled, googleCalendarApiKey, digestHour, dryRun, highlight };
 }

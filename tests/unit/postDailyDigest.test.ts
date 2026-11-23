@@ -5,7 +5,7 @@ import type { CalendarEvent } from '../../src/server/domain/calendarEvent.js';
 import { DailyDigestFormatter } from '../../src/server/infrastructure/dailyDigestFormatter.js';
 import { FakeDigestStore } from '../fakes/fakeDigestStore.js';
 import { FakeEventSource } from '../fakes/fakeEventSource.js';
-import { FakePostPinner } from '../fakes/fakePostPinner.js';
+import { FakePostHighlighter } from '../fakes/fakePostHighlighter.js';
 import { FakePublisher } from '../fakes/fakePublisher.js';
 
 const TZ = 'America/Chicago';
@@ -24,7 +24,7 @@ function makeUseCase(options: {
   digestStore?: FakeDigestStore;
   publisher?: Publisher;
   formatter?: DigestFormatter;
-  pinner?: FakePostPinner;
+  highlighter?: FakePostHighlighter;
   dryRun?: boolean;
 }): PostDailyDigestUseCase {
   return new PostDailyDigestUseCase({
@@ -32,7 +32,7 @@ function makeUseCase(options: {
     digestStore: options.digestStore ?? new FakeDigestStore(),
     formatter: options.formatter ?? new DailyDigestFormatter(TZ),
     publisher: options.publisher ?? new FakePublisher(),
-    pinner: options.pinner,
+    highlighter: options.highlighter,
     subreddit: 'BastropTX',
     timeZone: TZ,
     digestHour: 7,
@@ -166,53 +166,61 @@ describe('PostDailyDigestUseCase', () => {
     await expect(makeUseCase({ eventSource: failing }).run()).rejects.toThrow('calendar down');
   });
 
-  describe('pinning', () => {
-    it('unpins the previous digest, pins the new one and remembers it', async () => {
+  describe('community highlights', () => {
+    it('unhighlights the previous digest, highlights the new one and remembers it', async () => {
       const digestStore = new FakeDigestStore(null, 't3_old');
-      const pinner = new FakePostPinner();
-      const result = await makeUseCase({ digestStore, pinner }).run();
+      const highlighter = new FakePostHighlighter();
+      const result = await makeUseCase({ digestStore, highlighter }).run();
 
-      expect(pinner.calls).toEqual(['unpin:t3_old', 'pin:fake-submission-id']);
-      expect(digestStore.pinnedId).toBe('fake-submission-id');
-      expect(result).toMatchObject({ status: 'posted', pinned: true });
+      expect(highlighter.calls).toEqual(['unhighlight:t3_old', 'highlight:fake-submission-id']);
+      expect(digestStore.highlightedId).toBe('fake-submission-id');
+      expect(result).toMatchObject({ status: 'posted', highlighted: true });
     });
 
-    it('pins without unpinning when nothing was pinned before', async () => {
-      const pinner = new FakePostPinner();
-      await makeUseCase({ pinner }).run();
+    it('lets the highlight expire two hours after the next digest is due', async () => {
+      const highlighter = new FakePostHighlighter();
+      await makeUseCase({ highlighter }).run();
 
-      expect(pinner.calls).toEqual(['pin:fake-submission-id']);
+      // Posted Sunday Nov 22; Monday's digest is due 7 AM CST, so 9 AM CST is 15:00Z.
+      expect(highlighter.until[0].toISOString()).toBe('2026-11-23T15:00:00.000Z');
     });
 
-    it('still pins when the old post cannot be unpinned (e.g. it was deleted)', async () => {
+    it('highlights without unhighlighting when nothing was highlighted before', async () => {
+      const highlighter = new FakePostHighlighter();
+      await makeUseCase({ highlighter }).run();
+
+      expect(highlighter.calls).toEqual(['highlight:fake-submission-id']);
+    });
+
+    it('still highlights when the old post cannot be unhighlighted (e.g. it was deleted)', async () => {
       const digestStore = new FakeDigestStore(null, 't3_gone');
-      const pinner = new FakePostPinner('unpin');
-      const result = await makeUseCase({ digestStore, pinner }).run();
+      const highlighter = new FakePostHighlighter('unhighlight');
+      const result = await makeUseCase({ digestStore, highlighter }).run();
 
-      expect(pinner.calls).toEqual(['unpin:t3_gone', 'pin:fake-submission-id']);
-      expect(result.pinned).toBe(true);
+      expect(highlighter.calls).toEqual(['unhighlight:t3_gone', 'highlight:fake-submission-id']);
+      expect(result.highlighted).toBe(true);
     });
 
-    it('keeps the post and marks the day when pinning fails', async () => {
+    it('keeps the post and marks the day when highlighting fails', async () => {
       const digestStore = new FakeDigestStore(null, 't3_old');
-      const result = await makeUseCase({ digestStore, pinner: new FakePostPinner('pin') }).run();
+      const result = await makeUseCase({ digestStore, highlighter: new FakePostHighlighter('highlight') }).run();
 
-      expect(result).toMatchObject({ status: 'posted', pinned: false });
+      expect(result).toMatchObject({ status: 'posted', highlighted: false });
       expect(digestStore.lastDate).toBe('2026-11-22');
-      expect(digestStore.pinnedId).toBeNull();
+      expect(digestStore.highlightedId).toBeNull();
     });
 
-    it('reports nothing about pinning when no pinner is configured', async () => {
+    it('reports nothing about highlights when no highlighter is configured', async () => {
       const result = await makeUseCase({}).run();
 
-      expect(result.pinned).toBeUndefined();
+      expect(result.highlighted).toBeUndefined();
     });
 
-    it('does not pin in dry run', async () => {
-      const pinner = new FakePostPinner();
-      await makeUseCase({ pinner, dryRun: true }).run();
+    it('does not highlight in dry run', async () => {
+      const highlighter = new FakePostHighlighter();
+      await makeUseCase({ highlighter, dryRun: true }).run();
 
-      expect(pinner.calls).toEqual([]);
+      expect(highlighter.calls).toEqual([]);
     });
   });
 });

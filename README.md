@@ -69,8 +69,11 @@ to the public calendar.
   posted so it never posts twice in a day. A failed post is retried the next hour.
 - **No events, no post.** When nothing is listed for today (tomorrow alone does not
   count), the app posts nothing.
-- **Optional sticky.** With `stickyDigest` on, each digest is pinned and the previous
-  one unpinned, so the subreddit always shows the current day. It is off by default.
+- **Optional Community Highlight.** With `highlightDigest` on, each digest is added to
+  the subreddit's Community Highlights, labelled Event, and the app's previous digest
+  is removed, so the highlights always show the current day. Each highlight also
+  expires on its own two hours after the next digest is due, so a missed day never
+  leaves a stale one up. It is off by default.
 - **Moderators can remove a listing** by deleting it from the Google Calendar. The sync
   then leaves it out for good, so it never appears in a digest.
 
@@ -137,9 +140,9 @@ the events digest is on.
 | `eventsDigest` | `off` | `on` to post the daily events digest. |
 | `googleCalendarApiKey` | — | Google Cloud API key with the Google Calendar API enabled. Required when `eventsDigest` is on. May be the same key as `youtubeApiKey`. |
 | `eventsDigestHour` | `7` | Local (Central) hour, 0–23, from which the day's digest is posted. |
-| `stickyDigest` | `off` | `on` to pin each day's digest in place of the previous one. Takes a free sticky slot, or replaces the bottom sticky when both are in use. |
+| `highlightDigest` | `off` | `on` to add each day's digest to Community Highlights in place of the app's previous one. A subreddit holds six highlights; adding a seventh drops the last. |
 
-`eventsDigest` and `stickyDigest` are strings for the same reason as `dryRun`.
+`eventsDigest` and `highlightDigest` are strings for the same reason as `dryRun`.
 
 There is no setting for which subreddit to post to. The app posts to the subreddit it is
 installed in, so it cannot post anywhere else.
@@ -222,10 +225,10 @@ The following domains are requested for this app:
 - **Posts are attributed to the app account** (`runAs: 'APP'` in
   `src/server/infrastructure/redditPublisher.ts`). The app does not take actions on
   behalf of any redditor, and requests no such permission.
-- **The `moderator` Reddit scope is used only to sticky the digest.** Pinning today's
-  digest and unpinning yesterday's (`pin`/`unpin` in `redditPublisher.ts`) are moderator
-  actions. They run only when a moderator sets `stickyDigest` to `on`, and only on the
-  app's own digest posts.
+- **The `moderator` Reddit scope is used only to highlight the digest.** Adding today's
+  digest to Community Highlights and removing yesterday's (`highlight`/`unhighlight` in
+  `redditPublisher.ts`) are moderator actions. They run only when a moderator sets
+  `highlightDigest` to `on`, and only on the app's own digest posts.
 - **The app reads no Reddit user data.** It reads public YouTube metadata and, when the
   digest is on, public calendar events. It writes link posts and at most one daily text
   post. It does not read profiles, comments, votes, or messages.
@@ -239,7 +242,7 @@ The following domains are requested for this app:
   neither "YouTube" nor "YT".
 - **Stored data expires after 30 days**, matching YouTube's Developer Policies cap on
   retaining non-authorized API data. The events digest stores no event data at all,
-  only the date of the last digest it posted and, when sticky is on, that post's id.
+  only the date of the last digest it posted and, when highlighting is on, that post's id.
 - **Event listings are used with permission** from bastropcountycalendar.com's owner
   and from the City of Bastrop, and each event in a digest links back to its page on
   the source's site. The digest credits each source whose events it lists.
@@ -276,8 +279,8 @@ src/server/
 │   ├── redisVideoQueueStore.ts  Redis-backed queue, dedup, and time gate
 │   ├── googleCalendarEventSource.ts  Google Calendar API v3, public calendar
 │   ├── dailyDigestFormatter.ts  digest title and markdown body
-│   ├── redisDigestStore.ts      date and pinned post id of the last digest
-│   ├── redditPublisher.ts       submitPost (link and text posts), sticky/unsticky
+│   ├── redisDigestStore.ts      date and highlighted post id of the last digest
+│   ├── redditPublisher.ts       submitPost (link and text posts), highlight/unhighlight
 │   ├── videoFilters.ts          AcceptAllFilter, KeywordFilter, LandscapeOnlyFilter
 │   ├── filteredVideoSource.ts   VideoSource + VideoFilter -> VideoSource
 │   └── passthroughFormatter.ts  title and url, truncated to Reddit's limit
@@ -306,14 +309,14 @@ works out the local date and hour in `America/Chicago`. If the digest is due and
 been posted today, it reads today's and tomorrow's events (local midnight to midnight,
 so DST days are 23 or 25 hours). `buildDailyDigest` sorts them into today, ongoing and
 tomorrow, each event in one section only, and the formatter renders them as one text
-post. With a pinner configured, the new post then replaces the previous digest as a
-sticky; a pin failure is logged and never undoes or repeats the post.
+post. With a highlighter configured, the new post then replaces the previous digest in
+Community Highlights; a highlight failure is logged and never undoes or repeats the post.
 
 ## Development
 
 ```
 npm install
-npm test           # 227 unit tests
+npm test           # 228 unit tests
 npm run typecheck
 npm run build      # esbuild -> dist/server/index.cjs
 ```
@@ -334,7 +337,7 @@ npx devvit install <test subreddit> bastrop-news@<version>
 npx devvit settings set youtubeApiKey
 npx devvit settings set googleCalendarApiKey        # events digest only
 npx devvit settings set eventsDigest                # "on" to enable it
-npx devvit settings set stickyDigest                # optional: "on" to pin each digest
+npx devvit settings set highlightDigest             # optional: "on" to highlight each digest
 ```
 
 `devvit upload` updates no install, and `devvit settings set` only accepts keys declared
