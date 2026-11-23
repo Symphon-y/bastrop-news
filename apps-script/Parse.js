@@ -133,7 +133,11 @@ function normalizeEvent(fields) {
     endTime = endUsable ? toCalendarDateTime(end) : plusOneHour(start);
   }
 
-  var summaryText = String(fields.summary || '').trim();
+  // The page URL must stay the description's last line: it is the only place a public
+  // reader of the calendar (the Devvit digest) can find the event's link, because
+  // Calendar shows `source` to the event's creator only. So the summary is what gets cut.
+  var room = DESCRIPTION_MAX_LENGTH - fields.pageUrl.length - 2;
+  var summaryText = String(fields.summary || '').trim().slice(0, Math.max(0, room)).trim();
   var description = (summaryText ? summaryText + '\n\n' : '') + fields.pageUrl;
   var location = String(fields.location || '').trim();
   return {
@@ -143,7 +147,7 @@ function normalizeEvent(fields) {
     /** Canonical category slug (Labels.js), or null when unknown. */
     category: fields.category || null,
     title: fields.title,
-    description: description.slice(0, DESCRIPTION_MAX_LENGTH),
+    description: description,
     location: location || null,
     pageUrl: fields.pageUrl,
     /** Events the digest summarizes as a count instead of listing (e.g. "worship"); '' otherwise. */

@@ -53,7 +53,7 @@ to Reddit; see its README.
 
 ## Testing
 
-`npm test` — 222 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
+`npm test` — 227 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
 Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
 constructor injection and are tested against in-memory fakes in `tests/fakes/`.
 `apps-script/*.js` are plain Apps Script (global declarations, no modules).
@@ -113,6 +113,12 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   `timezone` is Central), it repeats some occurrences under different ids, and
   `isApproved` is false on everything the city shows. It is off unless the
   `CITY_SOURCE_ENABLED` script property is `on`.
+- **A public calendar read never sees `source`.** The Calendar API documents `source`
+  as "Can only be seen or modified by the creator of the event", and the digest reads
+  with an API key. Event links therefore come from the description's last line
+  (`eventLink` in `googleCalendarEventSource.ts`), which the sync keeps as the page URL
+  even when it shortens a description. Previews built from source data, not from a
+  real API-key read of the calendar, will not show this kind of problem.
 - **Worship services reach the digest as a count, via a shared extended property.**
   The sync sets `extendedProperties.shared.digestGroup = "worship"` on county records
   tagged `worship` (shared, not private, so the API-key read in

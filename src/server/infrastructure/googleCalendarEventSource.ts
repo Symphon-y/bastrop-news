@@ -17,12 +17,26 @@ export interface CalendarEventsResponse {
     status?: string;
     summary?: string;
     location?: string;
+    description?: string;
     start?: EventTime;
     end?: EventTime;
     source?: { url?: string };
     extendedProperties?: { shared?: { digestGroup?: string } };
   }[];
   nextPageToken?: string;
+}
+
+/** An http(s) URL ending the description, optionally wrapped in an <a> tag. */
+const TRAILING_URL = /(https?:\/\/[^\s"<>]+)(?:"[^>]*>[^<]*<\/a>|<\/a>)?\s*$/;
+
+/**
+ * The event's page link. `source.url` is creator-only in the Calendar API, so a
+ * public API-key read never sees it; the sync ends every description with the page
+ * URL for exactly this reason (apps-script/Parse.js, normalizeEvent).
+ */
+export function eventLink(item: { description?: string; source?: { url?: string } }): string | null {
+  const fromDescription = item.description ? TRAILING_URL.exec(item.description.trim())?.[1] : undefined;
+  return fromDescription ?? item.source?.url ?? null;
 }
 
 function toInstant(time: EventTime | undefined, timeZone: string): Date | null {
@@ -45,7 +59,7 @@ export function parseCalendarEvents(
     events.push({
       id: item.id,
       title: item.summary?.trim() || '(untitled event)',
-      url: item.source?.url ?? null,
+      url: eventLink(item),
       location: item.location?.trim() || null,
       start,
       end,

@@ -122,6 +122,12 @@ describe('parseSourceEvent', () => {
     expect(parseSourceEvent(record({})).digestGroup).toBe('');
   });
 
+  it('keeps the page URL at the end of a description it has to shorten', () => {
+    const event = parseSourceEvent(record({ summary: 'x'.repeat(5000) }));
+    expect(event.description.length).toBeLessThanOrEqual(4000);
+    expect(event.description.endsWith('\n\nhttps://bastropcountycalendar.com/events/sean-orr-2026-11-22')).toBe(true);
+  });
+
   it('tags the event with its source', () => {
     expect(parseSourceEvent(record({})).source).toBe('bcc');
   });

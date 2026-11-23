@@ -313,7 +313,7 @@ sticky; a pin failure is logged and never undoes or repeats the post.
 
 ```
 npm install
-npm test           # 222 unit tests
+npm test           # 227 unit tests
 npm run typecheck
 npm run build      # esbuild -> dist/server/index.cjs
 ```

@@ -42,6 +42,43 @@ describe('parseCalendarEvents', () => {
     expect(plain.digestGroup).toBeUndefined();
   });
 
+  describe('event links, as a public API-key read returns them', () => {
+    // `source` is creator-only ("Can only be seen or modified by the creator of the
+    // event"), so a public read never has it. The sync ends every description with the
+    // event's page URL, and descriptions are visible to public readers.
+    const publicItem = (description: string | undefined) => ({
+      id: 'p',
+      summary: 'Sewing Group at Bastrop Public Library',
+      start: { dateTime: '2026-11-23T13:00:00-06:00' },
+      end: { dateTime: '2026-11-23T16:00:00-06:00' },
+      description,
+    });
+    const urlOf = (description: string | undefined) => parseCalendarEvents({ items: [publicItem(description)] }, TZ)[0].url;
+
+    it('takes the link from the last line of the description', () => {
+      expect(
+        urlOf('Bring your own machine!\n\nHosted by Bastrop Public Library.\n\nhttps://connect.cityofbastrop.org/bastroptx/260228172'),
+      ).toBe('https://connect.cityofbastrop.org/bastroptx/260228172');
+    });
+
+    it('ignores links earlier in the description', () => {
+      expect(urlOf('Vendors apply at https://example.com/apply\n\nhttps://bastropcountycalendar.com/events/market')).toBe(
+        'https://bastropcountycalendar.com/events/market',
+      );
+    });
+
+    it('reads the link from a description Google Calendar has turned into HTML', () => {
+      expect(
+        urlOf('Live music<br><br><a href="https://bastropcountycalendar.com/events/sean-orr-2026-11-22">https://bastropcountycalendar.com/events/sean-orr-2026-11-22</a>'),
+      ).toBe('https://bastropcountycalendar.com/events/sean-orr-2026-11-22');
+    });
+
+    it('has no link when the description does not end with one', () => {
+      expect(urlOf('Just text, see https://example.com for more.')).toBeNull();
+      expect(urlOf(undefined)).toBeNull();
+    });
+  });
+
   it('parses timed events with their source link', () => {
     const [timed] = parseCalendarEvents(FIXTURE, TZ);
     expect(timed).toEqual({
