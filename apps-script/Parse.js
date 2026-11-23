@@ -269,6 +269,17 @@ function isOrphan(item, fetchedSources, activeSourceIds, today, windowEnd) {
 }
 
 /**
+ * A start or end for events.patch. PATCH merges nested objects field by field, so
+ * turning a timed event all-day (or back) must clear the other form explicitly, or
+ * the event ends up with both `date` and `dateTime` and Calendar rejects it with
+ * "Invalid start time".
+ */
+function patchTime(time) {
+  if (time.date) return { date: time.date, dateTime: null, timeZone: null };
+  return { date: null, dateTime: time.dateTime, timeZone: time.timeZone || null };
+}
+
+/**
  * Calendar API v3 event resource, minus the id (added on insert only). `labelId` is
  * written as eventLabelId when given; leaving it out leaves the label to the caller.
  */

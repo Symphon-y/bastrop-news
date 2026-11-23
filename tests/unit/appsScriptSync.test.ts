@@ -64,8 +64,20 @@ function makeWorld() {
       const existing = calendar.events.get(id);
       if (!existing) return respond(404, { error: { message: 'not found' } });
       if (method === 'patch') {
-        calendar.events.set(id, { ...existing, ...body });
-        return respond(200, calendar.events.get(id));
+        // Like the real API, PATCH merges nested objects field by field and a null clears
+        // a field, so start/end can end up holding both `date` and `dateTime`.
+        const merged: StoredEvent = { ...existing };
+        for (const [key, value] of Object.entries(body)) {
+          merged[key] =
+            value && typeof value === 'object' && !Array.isArray(value) && existing[key] && typeof existing[key] === 'object'
+              ? Object.fromEntries(Object.entries({ ...existing[key], ...value }).filter(([, v]) => v !== null))
+              : value;
+        }
+        for (const edge of [merged.start, merged.end]) {
+          if (edge?.date && edge?.dateTime) return respond(400, { error: { message: 'Invalid start time.' } });
+        }
+        calendar.events.set(id, merged);
+        return respond(200, merged);
       }
       if (method === 'delete') {
         // Calendar keeps deleted events as cancelled, without their properties.
@@ -224,6 +236,23 @@ describe('syncEvents', () => {
     const counts = world.sync();
 
     expect(counts.deleted).toBe(0);
+  });
+
+  it('switches an existing event between timed and all-day', () => {
+    world.sync();
+    world.setCounty([
+      countyEvent('opry', 'Main Street Advisory Board', 3, { allDay: true, updatedAt: '2026-11-02T00:00:00Z' }),
+      countyEvent('fair', 'Holiday Fair', 5),
+    ]);
+    expect(world.sync().updated).toBe(1);
+    const board = world.live().find((e) => e.summary === 'Main Street Advisory Board')!;
+    expect(board.start).toEqual({ date: localDate(3) });
+    expect(board.end).toEqual({ date: localDate(4) });
+
+    world.setCounty([countyEvent('opry', 'Main Street Advisory Board', 3, { updatedAt: '2026-11-03T00:00:00Z' })]);
+    world.sync();
+    const timed = world.live().find((e) => e.summary === 'Main Street Advisory Board')!;
+    expect(timed.start).toEqual({ dateTime: `${localDate(3)}T18:00:00`, timeZone: TZ });
   });
 
   it('removes an event its source dropped, and does not recreate one a moderator deleted', () => {

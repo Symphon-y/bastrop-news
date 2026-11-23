@@ -201,6 +201,8 @@ function syncEvents() {
     // moderator picked by hand.
     var keptLabel = categoryChanged ? labelId : current.eventLabelId || labelId;
     var patch = toCalendarResource(normalized, null);
+    patch.start = patchTime(normalized.start);
+    patch.end = patchTime(normalized.end);
     patch.eventLabelId = keptLabel;
     calendarOk(calendarRequest('patch', eventsPath + '/' + id, LABEL_QUERY, patch), 'events.patch');
     counts.updated++;

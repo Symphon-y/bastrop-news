@@ -16,6 +16,7 @@ const {
   sourceKeyForId,
   dedupeEvents,
   isOrphan,
+  patchTime,
 } = sandbox;
 const CATEGORIES: { slug: string; shortName: string; siteLabel: string; color: string }[] =
   sandbox.evaluate('CATEGORIES');
@@ -158,6 +159,17 @@ describe('calendarIdFor', () => {
     const id = calendarIdFor('cob:260228172', 'cob');
     expect(id).toMatch(/^bcob[0-9a-f]{64}$/);
     expect(id).toMatch(/^[0-9a-v]{5,1024}$/);
+  });
+});
+
+describe('patchTime', () => {
+  it('clears the other form so a patch can switch between timed and all-day', () => {
+    expect(patchTime({ date: '2026-11-22' })).toEqual({ date: '2026-11-22', dateTime: null, timeZone: null });
+    expect(patchTime({ dateTime: '2026-11-22T12:00:00', timeZone: 'America/Chicago' })).toEqual({
+      date: null,
+      dateTime: '2026-11-22T12:00:00',
+      timeZone: 'America/Chicago',
+    });
   });
 });
 
