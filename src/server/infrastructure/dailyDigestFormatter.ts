@@ -1,6 +1,6 @@
 import type { DailyDigest, DigestEntry } from '../application/digestSchedule.js';
 import type { DigestFormatter, FormattedTextPost } from '../application/ports.js';
-import { SOURCE_SITE_LINKS, SOURCE_SITE_URL } from '../eventsConfig.js';
+import { CITY_SOURCE, SOURCE_SITE_LINKS, SOURCE_SITE_URL } from '../eventsConfig.js';
 import { REDDIT_TITLE_MAX_LENGTH } from './passthroughFormatter.js';
 
 export const REDDIT_TEXT_MAX_LENGTH = 40_000;
@@ -38,7 +38,7 @@ export class DailyDigestFormatter implements DigestFormatter {
     ].filter((section) => section.lines.length > 0);
 
     const total = sections.reduce((sum, section) => sum + section.lines.length, 0);
-    return { title, body: this.assemble(sections, this.footer(), total) };
+    return { title, body: this.assemble(sections, this.footer(digest), total) };
   }
 
   private date(instant: Date, options: Intl.DateTimeFormatOptions): string {
@@ -63,13 +63,20 @@ export class DailyDigestFormatter implements DigestFormatter {
     return `* ${when ? `**${when}**: ` : ''}${parts.join(' · ')}`;
   }
 
-  private footer(): string {
+  private footer(digest: DailyDigest): string {
     const links = SOURCE_SITE_LINKS.map((link) => `[${link.label}](${link.url})`).join(' · ');
     const calendar = this.calendarUrl ? ` · [Subscribe to the calendar](${this.calendarUrl})` : '';
     return (
       `---\n\n**Plan ahead:** ${links}\n\n` +
-      `*Events from [Bastrop County Calendar](${SOURCE_SITE_URL})${calendar}*`
+      `*Events from [Bastrop County Calendar](${SOURCE_SITE_URL})${this.cityCredit(digest)}${calendar}*`
     );
+  }
+
+  /** Credits the city calendar only on days its events are actually listed. */
+  private cityCredit(digest: DailyDigest): string {
+    const entries = [...digest.todayEvents, ...digest.ongoing, ...digest.tomorrowEvents];
+    const listed = entries.some((entry) => entry.event.url?.startsWith(CITY_SOURCE.pageUrlPrefix));
+    return listed ? ` and the [${CITY_SOURCE.name}](${CITY_SOURCE.url})` : '';
   }
 
   /** Stops adding lines before the body would exceed Reddit's self-post limit. */

@@ -4,7 +4,8 @@ A Reddit app that watches a small, fixed list of YouTube channels and posts new 
 to the subreddit it is installed in. It was built for **r/BastropTX**, where the local
 government channel publishes city council and commission recordings that residents
 otherwise have to go looking for. It can also post a daily digest of local events from
-[bastropcountycalendar.com](https://bastropcountycalendar.com).
+[bastropcountycalendar.com](https://bastropcountycalendar.com) and the
+[City of Bastrop Community Calendar](https://connect.cityofbastrop.org/bastroptx/calendar).
 
 It runs entirely on Reddit's infrastructure. There is no server to host.
 
@@ -52,8 +53,12 @@ It ends with links to the source site's own Today, This weekend and This week pa
 to the public calendar.
 
 - **The events come from a public Google Calendar.** A separate Google Apps Script
-  (`apps-script/`) fills that calendar each morning at 5 AM from
-  bastropcountycalendar.com's listings, used with the site owner's permission. Residents
+  (`apps-script/`) fills that calendar each morning at 5 AM from two sources, both used
+  with their owners' permission: bastropcountycalendar.com, which aggregates 25+ county,
+  Elgin, Smithville, chamber and church calendars, and the City of Bastrop's own
+  Community Calendar (City Council and board meetings, the public library, Parks &
+  Recreation), which the aggregator does not carry. An event listed by both appears
+  once. Residents
   can subscribe to the same calendar.
 - **At most one digest per day.** The app checks hourly. It posts on the first check at
   or after `eventsDigestHour` (7 AM Central by default), and remembers the date it
@@ -231,8 +236,9 @@ The following domains are requested for this app:
 - **Stored data expires after 30 days**, matching YouTube's Developer Policies cap on
   retaining non-authorized API data. The events digest stores no event data at all,
   only the date of the last digest it posted and, when sticky is on, that post's id.
-- **Event listings are used with permission** from bastropcountycalendar.com's owner,
-  and each event in a digest links back to its page there.
+- **Event listings are used with permission** from bastropcountycalendar.com's owner
+  and from the City of Bastrop, and each event in a digest links back to its page on
+  the source's site. The digest credits each source whose events it lists.
 - **Posting is rate-limited in the app itself**, independently of the check schedule —
   see the three rules above.
 
@@ -277,9 +283,10 @@ src/server/
 └── index.ts                     composition root and scheduler endpoints
 
 apps-script/                     Google Apps Script: site events -> public calendar
-├── Labels.js                    categories and label matching
-├── Parse.js                     source record normalisation
-└── Sync.js                      daily sync and Calendar API calls
+├── Labels.js                    categories, label matching, city categories
+├── Parse.js                     shared normalisation, county source, dedupe
+├── CitySource.js                City of Bastrop calendar (withapps API)
+└── Sync.js                      daily sync over every source, Calendar API calls
 ```
 
 `CheckAndPostUseCase.run()` does two things per tick:
@@ -302,7 +309,7 @@ sticky; a pin failure is logged and never undoes or repeats the post.
 
 ```
 npm install
-npm test           # 160 unit tests
+npm test           # 213 unit tests
 npm run typecheck
 npm run build      # esbuild -> dist/server/index.cjs
 ```

@@ -22,8 +22,10 @@ published it. This app publishes no video content of its own; it links to the so
 The events digest reads a public Google Calendar through the Google Calendar API, under
 the [Google APIs Terms of Service](https://developers.google.com/terms). The calendar is
 filled from the public listings on
-[bastropcountycalendar.com](https://bastropcountycalendar.com), with the site owner's
-permission, and every event in a digest links back to its page there. Event details
+[bastropcountycalendar.com](https://bastropcountycalendar.com) and the
+[City of Bastrop Community Calendar](https://connect.cityofbastrop.org/bastroptx/calendar),
+with their owners' permission, and every event in a digest links back to its page on
+the source's site. Event details
 belong to their organizers; the app does not vouch for their accuracy, and dates, times,
 and venues should be confirmed with the organizer.
 
@@ -75,7 +77,8 @@ detect, resist, or re-create removed posts.
 
 This app is provided as-is and without warranty, for community use. It may be modified,
 paused, or discontinued at any time. Availability also depends on the YouTube Data API,
-the Google Calendar API, bastropcountycalendar.com, and Reddit's platform, none of which
+the Google Calendar API, bastropcountycalendar.com, the City of Bastrop's calendar, and
+Reddit's platform, none of which
 this app controls.
 
 ## Contact

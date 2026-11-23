@@ -46,16 +46,20 @@ today and tomorrow in one call; `buildDailyDigest` (pure) decides which section 
 event belongs to, and `DailyDigestFormatter` only renders. Pinning is a separate
 `PostPinner` port, optional, and runs after the day is marked so a pin failure can
 never cause a second post.
-`apps-script/` is a separate Google Apps Script that fills the calendar from
-bastropcountycalendar.com. It is never uploaded to Reddit; see its README.
+`apps-script/` is a separate Google Apps Script that fills the calendar from two
+sources: bastropcountycalendar.com (an aggregator of 25+ calendars) and the City of
+Bastrop's Community Calendar, which the aggregator does not carry. It is never uploaded
+to Reddit; see its README.
 
 ## Testing
 
-`npm test` — 160 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
+`npm test` — 213 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
 Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
 constructor injection and are tested against in-memory fakes in `tests/fakes/`.
-`apps-script/Labels.js` and `Parse.js` are plain Apps Script (global declarations, no
-modules). Their test evaluates them in a `node:vm` sandbox with a stub `Utilities`.
+`apps-script/*.js` are plain Apps Script (global declarations, no modules).
+`tests/fakes/appsScriptSandbox.ts` evaluates them in a `node:vm` sandbox with a stub
+`Utilities`; `appsScriptSync.test.ts` runs `syncEvents()` end to end against in-memory
+Calendar, source and properties fakes.
 
 `npm run typecheck`, `npm run build` (esbuild → `dist/server/index.cjs`). `devvit.json`
 can be validated against `node_modules/@devvit/shared-types/schemas/config-file.v1.json`.
@@ -98,10 +102,23 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   working tree ships to reviewers.
 - **Devvit cron is UTC; Central time lives in the use case.** Do not "fix" the digest
   to a daily cron at 13:00 UTC: it would drift an hour at every DST change.
-- **The events source has messy dates.** `bastropcountycalendar.com/api/events` returns
-  naive local datetimes, date-only or missing ends on timed events, and a few garbage
-  starts (`"January 1, 1863T00:00:00"`). `apps-script/Parse.js` normalizes them; its
-  tests use those real shapes.
+- **The county source has messy dates.** `bastropcountycalendar.com/api/public/events`
+  (documented in the site's `/llms.txt`; use it, not the older `/api/events`) returns
+  naive local datetimes and date-only or missing ends on timed events.
+  `normalizeEvent` in `apps-script/Parse.js` handles them for every source.
+- **The city source is an undocumented vendor API.** `api.withapps.io` serves the City
+  of Bastrop calendar widget (org 56, community 261); found by capturing the widget's
+  network calls. Its `plainDescription` is lowercased (use the HTML `description`), its
+  UTC fields put evening events on the next day (use the local `startsAt` when
+  `timezone` is Central), it repeats some occurrences under different ids, and
+  `isApproved` is false on everything the city shows. It is off unless the
+  `CITY_SOURCE_ENABLED` script property is `on`.
+- **A source is only ever allowed to delete its own events, and only after a
+  non-empty read.** `isOrphan` checks the id prefix (`bcc`, `bcob`) against the sources
+  that answered this run. Keep it that way: a vendor outage that returns `[]` would
+  otherwise wipe that source from the calendar.
+- **Apps Script does not guarantee file load order.** Top-level values in one file must
+  not reference another file's functions directly; `SOURCE_READERS` wraps them.
 - **Calendar event labels need `eventLabelVersion=1` on every event write**, or
   `eventLabelId` is ignored. On a labelled write, omitting `eventLabelId` clears the
   label, so patches always send it. The sync calls the REST API through

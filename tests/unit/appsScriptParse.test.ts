@@ -1,26 +1,7 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
+import { loadAppsScript } from '../fakes/appsScriptSandbox.js';
 
-/**
- * The apps-script files are plain Apps Script (global declarations, no module syntax)
- * that share one global scope, so they are evaluated together in a sandbox with a
- * stand-in for Utilities.
- */
-const sandbox: Record<string, any> = {
-  Utilities: {
-    DigestAlgorithm: { SHA_256: 'sha256' },
-    Charset: { UTF_8: 'utf8' },
-    // Apps Script returns signed bytes; mirror that so bytesToHex is exercised.
-    computeDigest: (_algorithm: string, value: string) =>
-      [...createHash('sha256').update(value, 'utf8').digest()].map((b) => (b > 127 ? b - 256 : b)),
-  },
-};
-vm.createContext(sandbox);
-for (const file of ['Labels.js', 'Parse.js']) {
-  vm.runInContext(readFileSync(new URL(`../../apps-script/${file}`, import.meta.url), 'utf8'), sandbox);
-}
+const sandbox = loadAppsScript();
 const {
   parseSourceEvent,
   calendarIdFor,
@@ -30,27 +11,32 @@ const {
   canonicalCategory,
   normalizeLabelName,
   matchLabels,
+  countyEventsUrl,
+  countyRecords,
+  sourceKeyForId,
+  dedupeEvents,
+  isOrphan,
 } = sandbox;
-const CATEGORIES: { slug: string; shortName: string; siteLabel: string; color: string }[] = vm.runInContext(
-  'CATEGORIES',
-  sandbox,
-);
-const CATEGORY_ALIASES: Record<string, string> = vm.runInContext('CATEGORY_ALIASES', sandbox);
+const CATEGORIES: { slug: string; shortName: string; siteLabel: string; color: string }[] =
+  sandbox.evaluate('CATEGORIES');
+const CATEGORY_ALIASES: Record<string, string> = sandbox.evaluate('CATEGORY_ALIASES');
 
+/** A record in the shape of bastropcountycalendar.com/api/public/events. */
 function record(overrides: Record<string, unknown>) {
   return {
     id: 'sean-orr-2026-11-22',
-    title: 'Sean Orr',
     slug: 'sean-orr-2026-11-22',
-    short_summary: 'Live music',
-    start_datetime: '2026-11-22T12:00:00',
-    end_datetime: '2026-11-22T14:00:00',
-    all_day: 0,
-    location_name: "The Grace Miller \"Gracie's\"",
-    location_address: null,
+    url: 'https://bastropcountycalendar.com/events/sean-orr-2026-11-22',
+    title: 'Sean Orr',
+    summary: 'Live music',
+    start: '2026-11-22T12:00:00',
+    end: '2026-11-22T14:00:00',
+    allDay: false,
+    venue: "The Grace Miller \"Gracie's\"",
+    address: '',
     category: 'music',
     status: 'active',
-    updated_at: '2026-11-22 21:00:32',
+    updatedAt: '2026-11-22T21:00:32Z',
     ...overrides,
   };
 }
@@ -67,61 +53,74 @@ describe('parseSourceEvent', () => {
   });
 
   it('gives a timed event with a date-only end one hour', () => {
-    const event = parseSourceEvent(record({ end_datetime: '2026-11-22' }));
+    const event = parseSourceEvent(record({ end: '2026-11-22' }));
     expect(event.end.dateTime).toBe('2026-11-22T13:00:00');
   });
 
   it('gives a timed event with a null, empty, or earlier end one hour', () => {
-    expect(parseSourceEvent(record({ end_datetime: null })).end.dateTime).toBe('2026-11-22T13:00:00');
-    expect(parseSourceEvent(record({ end_datetime: '' })).end.dateTime).toBe('2026-11-22T13:00:00');
-    expect(parseSourceEvent(record({ end_datetime: '2026-11-22T09:00:00' })).end.dateTime).toBe('2026-11-22T13:00:00');
+    expect(parseSourceEvent(record({ end: null })).end.dateTime).toBe('2026-11-22T13:00:00');
+    expect(parseSourceEvent(record({ end: '' })).end.dateTime).toBe('2026-11-22T13:00:00');
+    expect(parseSourceEvent(record({ end: '2026-11-22T09:00:00' })).end.dateTime).toBe('2026-11-22T13:00:00');
   });
 
   it('rolls a late-evening default end into the next day', () => {
-    const event = parseSourceEvent(record({ start_datetime: '2026-11-22T23:30:00', end_datetime: null }));
+    const event = parseSourceEvent(record({ start: '2026-11-22T23:30:00', end: null }));
     expect(event.end.dateTime).toBe('2026-11-23T00:30:00');
   });
 
   it('preserves an explicit offset', () => {
     const event = parseSourceEvent(
-      record({ start_datetime: '2026-12-01T18:00:00-06:00', end_datetime: '2026-12-01T20:00:00-06:00' }),
+      record({ start: '2026-12-01T18:00:00-06:00', end: '2026-12-01T20:00:00-06:00' }),
     );
     expect(event.start.dateTime).toBe('2026-12-01T18:00:00-06:00');
     expect(event.end.dateTime).toBe('2026-12-01T20:00:00-06:00');
   });
 
   it('defaults an offset start without a matching end to one hour, in UTC', () => {
-    const event = parseSourceEvent(record({ start_datetime: '2026-12-01T18:00:00-06:00', end_datetime: '2026-12-01' }));
+    const event = parseSourceEvent(record({ start: '2026-12-01T18:00:00-06:00', end: '2026-12-01' }));
     expect(event.end.dateTime).toBe('2026-12-02T01:00:00Z');
   });
 
   it('makes a single-day all-day event end the next day (exclusive)', () => {
-    const event = parseSourceEvent(record({ all_day: 1, start_datetime: '2026-11-22T00:00:00', end_datetime: '2026-11-22' }));
+    const event = parseSourceEvent(record({ allDay: true, start: '2026-11-22T00:00:00', end: '2026-11-22' }));
     expect(event.allDay).toBe(true);
     expect(event.start).toEqual({ date: '2026-11-22' });
     expect(event.end).toEqual({ date: '2026-11-23' });
   });
 
   it('spans a multi-day all-day event through its last day', () => {
-    const event = parseSourceEvent(record({ all_day: 1, start_datetime: '2026-11-07T00:00:00', end_datetime: '2026-12-27' }));
+    const event = parseSourceEvent(record({ allDay: true, start: '2026-11-07T00:00:00', end: '2026-12-27' }));
     expect(event.end).toEqual({ date: '2026-12-28' });
   });
 
   it('treats a date-only start as all-day', () => {
-    expect(parseSourceEvent(record({ start_datetime: '2026-11-22', end_datetime: null })).allDay).toBe(true);
+    expect(parseSourceEvent(record({ start: '2026-11-22', end: null })).allDay).toBe(true);
   });
 
   it('rejects garbage dates, inactive records, and records without a title', () => {
-    expect(parseSourceEvent(record({ start_datetime: 'January 1, 1863T00:00:00' }))).toBeNull();
-    expect(parseSourceEvent(record({ start_datetime: 'December 9, 2026T19:00:00' }))).toBeNull();
-    expect(parseSourceEvent(record({ start_datetime: '2026-13-40T00:00:00' }))).toBeNull();
+    expect(parseSourceEvent(record({ start: 'January 1, 1863T00:00:00' }))).toBeNull();
+    expect(parseSourceEvent(record({ start: 'December 9, 2026T19:00:00' }))).toBeNull();
+    expect(parseSourceEvent(record({ start: '2026-13-40T00:00:00' }))).toBeNull();
     expect(parseSourceEvent(record({ status: 'cancelled' }))).toBeNull();
     expect(parseSourceEvent(record({ title: '  ' }))).toBeNull();
     expect(parseSourceEvent(null)).toBeNull();
   });
 
+  it('uses the record\'s own page url, falling back to the slug', () => {
+    expect(parseSourceEvent(record({ url: 'https://bastropcountycalendar.com/events/x' })).pageUrl).toBe(
+      'https://bastropcountycalendar.com/events/x',
+    );
+    expect(parseSourceEvent(record({ url: null })).pageUrl).toBe(
+      'https://bastropcountycalendar.com/events/sean-orr-2026-11-22',
+    );
+  });
+
+  it('tags the event with its source', () => {
+    expect(parseSourceEvent(record({})).source).toBe('bcc');
+  });
+
   it('prefers the street address for location', () => {
-    expect(parseSourceEvent(record({ location_address: '904 Main St, Bastrop, TX' })).location).toBe(
+    expect(parseSourceEvent(record({ address: '904 Main St, Bastrop, TX' })).location).toBe(
       '904 Main St, Bastrop, TX',
     );
   });
@@ -129,9 +128,9 @@ describe('parseSourceEvent', () => {
 
 describe('inWindow', () => {
   it('includes events touching the window, including ongoing multi-day ones', () => {
-    const ongoing = parseSourceEvent(record({ all_day: 1, start_datetime: '2026-11-07T00:00:00', end_datetime: '2026-12-27' }));
-    const past = parseSourceEvent(record({ start_datetime: '2026-11-20T12:00:00', end_datetime: null }));
-    const far = parseSourceEvent(record({ start_datetime: '2027-03-01T12:00:00', end_datetime: null }));
+    const ongoing = parseSourceEvent(record({ allDay: true, start: '2026-11-07T00:00:00', end: '2026-12-27' }));
+    const past = parseSourceEvent(record({ start: '2026-11-20T12:00:00', end: null }));
+    const far = parseSourceEvent(record({ start: '2027-03-01T12:00:00', end: null }));
 
     expect(inWindow(ongoing, '2026-11-22', '2027-01-06')).toBe(true);
     expect(inWindow(past, '2026-11-22', '2027-01-06')).toBe(false);
@@ -139,8 +138,8 @@ describe('inWindow', () => {
   });
 
   it('includes an all-day event ending today but not one that ended yesterday', () => {
-    const endsToday = parseSourceEvent(record({ all_day: 1, start_datetime: '2026-11-20T00:00:00', end_datetime: '2026-11-22' }));
-    const endedYesterday = parseSourceEvent(record({ all_day: 1, start_datetime: '2026-11-20T00:00:00', end_datetime: '2026-11-21' }));
+    const endsToday = parseSourceEvent(record({ allDay: true, start: '2026-11-20T00:00:00', end: '2026-11-22' }));
+    const endedYesterday = parseSourceEvent(record({ allDay: true, start: '2026-11-20T00:00:00', end: '2026-11-21' }));
     expect(inWindow(endsToday, '2026-11-22', '2027-01-06')).toBe(true);
     expect(inWindow(endedYesterday, '2026-11-22', '2027-01-06')).toBe(false);
   });
@@ -154,6 +153,107 @@ describe('calendarIdFor', () => {
     expect(id).toMatch(/^bcc[0-9a-f]{64}$/);
     expect(id).toMatch(/^[0-9a-v]{5,1024}$/);
   });
+
+  it('uses the source\'s prefix, which must also be base32hex', () => {
+    const id = calendarIdFor('cob:260228172', 'cob');
+    expect(id).toMatch(/^bcob[0-9a-f]{64}$/);
+    expect(id).toMatch(/^[0-9a-v]{5,1024}$/);
+  });
+});
+
+describe('sourceKeyForId', () => {
+  it('maps an event id back to the source that owns it', () => {
+    expect(sourceKeyForId(calendarIdFor('x'))).toBe('bcc');
+    expect(sourceKeyForId(calendarIdFor('cob:1', 'cob'))).toBe('cob');
+    expect(sourceKeyForId('someoneelse123')).toBeNull();
+  });
+});
+
+describe('countyEventsUrl and countyRecords', () => {
+  it('asks the documented public API for just the sync window', () => {
+    expect(countyEventsUrl('2026-11-22', '2027-01-06')).toBe(
+      'https://bastropcountycalendar.com/api/public/events?from=2026-11-22&to=2027-01-06',
+    );
+  });
+
+  it('unwraps the events array and rejects anything else', () => {
+    expect(countyRecords({ events: [{ id: 'a' }], omitted: [] })).toEqual([{ id: 'a' }]);
+    expect(() => countyRecords([{ id: 'a' }])).toThrow();
+    expect(() => countyRecords({ error: 'x' })).toThrow();
+  });
+});
+
+describe('dedupeEvents', () => {
+  const county = (title: string, start: string) =>
+    parseSourceEvent(record({ id: title + start, title, start, end: null }));
+  const city = (title: string, start: string) => ({ ...county(title, start), source: 'cob', sourceId: 'cob:' + title + start });
+
+  it('drops a later source\'s event with the same title on the same day', () => {
+    const { kept, dropped } = dedupeEvents([
+      county('Main Street Advisory Board', '2026-12-02T12:00:00'),
+      city('Main Street Advisory Board', '2026-12-02T17:30:00'),
+    ]);
+    expect(kept.map((e: any) => e.source)).toEqual(['bcc']);
+    expect(dropped).toBe(1);
+  });
+
+  it('ignores case and punctuation when comparing titles', () => {
+    const { kept } = dedupeEvents([county('Farm Street Opry', '2026-12-03T19:00:00'), city('FARM STREET OPRY!', '2026-12-03T19:00:00')]);
+    expect(kept).toHaveLength(1);
+  });
+
+  it('drops exact repeats within one source but keeps same-title events at other times', () => {
+    const { kept } = dedupeEvents([
+      city('Bastrop Fiber Arts', '2026-12-18 15:00'),
+      city('Bastrop Fiber Arts', '2026-12-18 15:00'),
+      city('Storytime', '2026-12-18 10:00'),
+      city('Storytime', '2026-12-18 16:00'),
+    ]);
+    expect(kept).toHaveLength(3);
+  });
+
+  it('keeps the same title on different days', () => {
+    const { kept } = dedupeEvents([county('Bingo', '2026-12-02T19:00:00'), city('Bingo', '2026-12-09T19:00:00')]);
+    expect(kept).toHaveLength(2);
+  });
+});
+
+describe('isOrphan', () => {
+  const item = (overrides: Record<string, unknown>) => ({
+    id: calendarIdFor('gone'),
+    status: 'confirmed',
+    start: { dateTime: '2026-11-25T18:00:00-06:00' },
+    end: { dateTime: '2026-11-25T19:00:00-06:00' },
+    extendedProperties: { private: { source: 'bcc', sourceId: 'gone' } },
+    ...overrides,
+  });
+  const ok = { bcc: true };
+
+  it('is true for an in-window event its source no longer lists', () => {
+    expect(isOrphan(item({}), ok, {}, '2026-11-22', '2027-01-06')).toBe(true);
+  });
+
+  it('is false while the source still lists it', () => {
+    expect(isOrphan(item({}), ok, { gone: true }, '2026-11-22', '2027-01-06')).toBe(false);
+  });
+
+  it('never removes events that already ended or lie past the window', () => {
+    const ended = item({ start: { dateTime: '2026-11-21T18:00:00-06:00' }, end: { dateTime: '2026-11-21T19:00:00-06:00' } });
+    const beyond = item({ start: { date: '2027-01-07' }, end: { date: '2027-01-08' } });
+    expect(isOrphan(ended, ok, {}, '2026-11-22', '2027-01-06')).toBe(false);
+    expect(isOrphan(beyond, ok, {}, '2026-11-22', '2027-01-06')).toBe(false);
+  });
+
+  it('leaves a source\'s events alone when that source was not fetched this run', () => {
+    expect(isOrphan(item({}), {}, {}, '2026-11-22', '2027-01-06')).toBe(false);
+    const cityItem = item({ id: calendarIdFor('cob:1', 'cob'), extendedProperties: { private: { source: 'cob', sourceId: 'cob:1' } } });
+    expect(isOrphan(cityItem, ok, {}, '2026-11-22', '2027-01-06')).toBe(false);
+  });
+
+  it('skips cancelled entries and events without our properties', () => {
+    expect(isOrphan(item({ status: 'cancelled' }), ok, {}, '2026-11-22', '2027-01-06')).toBe(false);
+    expect(isOrphan(item({ extendedProperties: undefined }), ok, {}, '2026-11-22', '2027-01-06')).toBe(false);
+  });
 });
 
 describe('toCalendarResource', () => {
@@ -166,7 +266,7 @@ describe('toCalendarResource', () => {
     expect(resource.extendedProperties.private).toEqual({
       source: 'bcc',
       sourceId: 'sean-orr-2026-11-22',
-      sourceUpdatedAt: '2026-11-22 21:00:32',
+      sourceUpdatedAt: '2026-11-22T21:00:32Z',
       sourceCategory: 'music',
     });
     expect(resource.id).toBeUndefined();

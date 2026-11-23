@@ -9,6 +9,16 @@ export const EVENTS_CALENDAR_ID =
 
 export const SOURCE_SITE_URL = 'https://bastropcountycalendar.com';
 
+/**
+ * Sources the calendar is filled from, credited in a digest when any of its events
+ * links to `pageUrlPrefix`. The county aggregator is always credited.
+ */
+export const CITY_SOURCE = {
+  name: 'City of Bastrop Community Calendar',
+  url: 'https://connect.cityofbastrop.org/bastroptx/calendar',
+  pageUrlPrefix: 'https://connect.cityofbastrop.org/',
+} as const;
+
 /** The source site's own filtered views, linked from every digest for planning ahead. */
 export const SOURCE_SITE_LINKS: readonly { label: string; url: string }[] = [
   { label: 'Today', url: `${SOURCE_SITE_URL}/today` },

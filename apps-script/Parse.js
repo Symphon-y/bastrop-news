@@ -1,17 +1,27 @@
 /**
- * Pure functions: no Apps Script services except Utilities.computeDigest in
- * calendarIdFor, and canonicalCategory from Labels.js. Apps Script loads every file into one global scope, so these are
- * plain top-level declarations; tests/unit/appsScriptParse.test.ts evaluates this
- * file in a sandbox to reach them.
+ * Pure functions shared by every source: no Apps Script services except
+ * Utilities.computeDigest in calendarIdFor. Apps Script loads every file into one global
+ * scope, so these are plain top-level declarations; the tests evaluate the files in a
+ * sandbox (tests/fakes/appsScriptSandbox.ts) to reach them.
  */
 
-var SOURCE_URL = 'https://bastropcountycalendar.com/api/events';
+/** bastropcountycalendar.com's documented public API (see its /llms.txt). */
+var COUNTY_API = 'https://bastropcountycalendar.com/api/public/events';
 var EVENT_PAGE_BASE = 'https://bastropcountycalendar.com/events/';
-/** The source's datetimes are naive local times in this zone. */
+/** Every source's naive local datetimes are in this zone, and so is the calendar. */
 var SOURCE_TIME_ZONE = 'America/Chicago';
-/** Marks calendar events this script owns, both in their id and their properties. */
-var ID_PREFIX = 'bcc';
 var DESCRIPTION_MAX_LENGTH = 4000;
+
+/**
+ * Every source this script syncs, keyed by the tag stored in each event's private
+ * properties. The id prefix is how ownership is recognised: deleted events come back
+ * without their properties. Prefixes must be base32hex ([a-v0-9]), and none may be a
+ * prefix of another.
+ */
+var SOURCES = {
+  bcc: { idPrefix: 'bcc', title: 'Bastrop County Calendar' },
+  cob: { idPrefix: 'bcob', title: 'City of Bastrop Community Calendar' },
+};
 
 var DATE_TIME_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
@@ -97,22 +107,19 @@ function plusOneHour(parsed) {
 }
 
 /**
- * Normalises one source record, or returns null if it is inactive or unusable.
+ * Builds the event shape every source produces, from loose date strings. Returns null
+ * when the start is unusable.
  *
- * The source's end values are inconsistent: a date with no time on many timed events,
+ * End values are inconsistent across sources: a date with no time on many timed events,
  * null or empty on others. All-day ends are treated as the inclusive last day (Google
  * wants exclusive, hence +1 day). Timed events without a usable end get one hour.
  */
-function parseSourceEvent(record) {
-  if (!record || record.status !== 'active') return null;
-  var sourceId = typeof record.id === 'string' ? record.id.trim() : '';
-  var title = typeof record.title === 'string' ? record.title.trim() : '';
-  if (!sourceId || !title) return null;
-  var start = parseSourceDateTime(record.start_datetime);
-  if (!start) return null;
-  var end = parseSourceDateTime(record.end_datetime);
+function normalizeEvent(fields) {
+  var start = parseSourceDateTime(fields.start);
+  if (!start || !fields.sourceId || !fields.title) return null;
+  var end = parseSourceDateTime(fields.end);
 
-  var allDay = Number(record.all_day) === 1 || !start.hasTime;
+  var allDay = Boolean(fields.allDay) || !start.hasTime;
   var startTime;
   var endTime;
   if (allDay) {
@@ -126,24 +133,53 @@ function parseSourceEvent(record) {
     endTime = endUsable ? toCalendarDateTime(end) : plusOneHour(start);
   }
 
-  var pageUrl = EVENT_PAGE_BASE + (record.slug || sourceId);
-  var summaryText = String(record.short_summary || record.description || '').trim();
-  var description = (summaryText ? summaryText + '\n\n' : '') + pageUrl;
-  var location = String(record.location_address || record.location_name || '').trim();
-
+  var summaryText = String(fields.summary || '').trim();
+  var description = (summaryText ? summaryText + '\n\n' : '') + fields.pageUrl;
+  var location = String(fields.location || '').trim();
   return {
-    sourceId: sourceId,
-    updatedAt: String(record.updated_at || ''),
-    /** Canonical category slug (Labels.js), or null when the source's is unknown. */
-    category: canonicalCategory(record.category),
-    title: title,
+    source: fields.source,
+    sourceId: fields.sourceId,
+    updatedAt: String(fields.updatedAt || ''),
+    /** Canonical category slug (Labels.js), or null when unknown. */
+    category: fields.category || null,
+    title: fields.title,
     description: description.slice(0, DESCRIPTION_MAX_LENGTH),
     location: location || null,
-    pageUrl: pageUrl,
+    pageUrl: fields.pageUrl,
     allDay: allDay,
     start: startTime,
     end: endTime,
   };
+}
+
+/** Normalises one bastropcountycalendar.com record, or null if inactive or unusable. */
+function parseSourceEvent(record) {
+  if (!record || record.status !== 'active') return null;
+  var sourceId = typeof record.id === 'string' ? record.id.trim() : '';
+  var title = typeof record.title === 'string' ? record.title.trim() : '';
+  return normalizeEvent({
+    source: 'bcc',
+    sourceId: sourceId,
+    title: title,
+    start: record.start,
+    end: record.end,
+    allDay: record.allDay === true,
+    summary: record.summary || record.description,
+    location: record.address || record.venue,
+    pageUrl: record.url || EVENT_PAGE_BASE + (record.slug || sourceId),
+    updatedAt: record.updatedAt,
+    category: canonicalCategory(record.category),
+  });
+}
+
+/** `to` is inclusive, and events already running on `from` are included. */
+function countyEventsUrl(today, windowEnd) {
+  return COUNTY_API + '?from=' + today + '&to=' + windowEnd;
+}
+
+function countyRecords(json) {
+  if (!json || !Array.isArray(json.events)) throw new Error('County source did not return {events: [...]}');
+  return json.events;
 }
 
 /** The local calendar date an event starts on, and the last date it covers. */
@@ -172,11 +208,64 @@ function bytesToHex(bytes) {
 
 /**
  * Deterministic event id, so a source event always maps to the same calendar entry.
- * Calendar ids allow only [a-v0-9]; hex digits and the prefix are within that.
+ * Calendar ids allow only [a-v0-9]; hex digits and the prefixes are within that.
  */
-function calendarIdFor(sourceId) {
+function calendarIdFor(sourceId, sourceKey) {
+  var prefix = SOURCES[sourceKey || 'bcc'].idPrefix;
   var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, sourceId, Utilities.Charset.UTF_8);
-  return ID_PREFIX + bytesToHex(digest);
+  return prefix + bytesToHex(digest);
+}
+
+/** The source that owns a calendar event id, or null for events this script did not make. */
+function sourceKeyForId(id) {
+  var keys = Object.keys(SOURCES);
+  for (var i = 0; i < keys.length; i++) {
+    if (String(id).indexOf(SOURCES[keys[i]].idPrefix) === 0) return keys[i];
+  }
+  return null;
+}
+
+function normalizeTitle(title) {
+  return String(title).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Drops repeats, keeping the first occurrence, so sources are listed in priority order.
+ * Within a source only exact repeats (same title and start) go: two storytimes on one
+ * day are two events. Across sources the same title on the same day is the same event.
+ */
+function dedupeEvents(events) {
+  var exact = {};
+  var sameDay = {};
+  var kept = [];
+  events.forEach(function (event) {
+    var title = normalizeTitle(event.title);
+    var startKey = event.start.date || event.start.dateTime;
+    var dayKey = title + '|' + eventDateSpan(event).startDate;
+    var exactKey = title + '|' + startKey;
+    var firstSource = sameDay[dayKey];
+    if (exact[exactKey] || (firstSource && firstSource !== event.source)) return;
+    exact[exactKey] = true;
+    if (!firstSource) sameDay[dayKey] = event.source;
+    kept.push(event);
+  });
+  return { kept: kept, dropped: events.length - kept.length };
+}
+
+/**
+ * True for an event this script made whose source was read this run and no longer
+ * lists it. Events that have ended, or lie beyond the window, are never removed: the
+ * source was not asked about them. `item` is a Calendar event resource; its start and
+ * end have the same shape as a normalized event's.
+ */
+function isOrphan(item, fetchedSources, activeSourceIds, today, windowEnd) {
+  if (!item || item.status === 'cancelled') return false;
+  var key = sourceKeyForId(item.id);
+  if (!key || !fetchedSources[key]) return false;
+  var stored = item.extendedProperties && item.extendedProperties.private;
+  if (!stored || stored.source !== key || activeSourceIds[stored.sourceId]) return false;
+  if (!item.start || !item.end) return false;
+  return inWindow(item, today, windowEnd);
 }
 
 /**
@@ -189,10 +278,10 @@ function toCalendarResource(normalized, labelId) {
     description: normalized.description,
     start: normalized.start,
     end: normalized.end,
-    source: { title: 'Bastrop County Calendar', url: normalized.pageUrl },
+    source: { title: SOURCES[normalized.source].title, url: normalized.pageUrl },
     extendedProperties: {
       private: {
-        source: ID_PREFIX,
+        source: normalized.source,
         sourceId: normalized.sourceId,
         sourceUpdatedAt: normalized.updatedAt,
         sourceCategory: normalized.category || '',

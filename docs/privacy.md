@@ -25,10 +25,12 @@ same Google Privacy Policy.
   filter. They are used only to tell a vertical Short from the horizontal original of
   the same story, and are discarded once that is decided; they are never stored.
 - **Public calendar events** (title, start and end time, venue, and a link to the
-  event's page) for the current day, read from a public Google Calendar through the
-  Google Calendar API v3. That calendar is filled from the public listings on
-  [bastropcountycalendar.com](https://bastropcountycalendar.com), with the site owner's
-  permission. Events describe public happenings, not people.
+  event's page) for the current and next day, read from a public Google Calendar through
+  the Google Calendar API v3. That calendar is filled from the public listings on
+  [bastropcountycalendar.com](https://bastropcountycalendar.com) and the
+  [City of Bastrop Community Calendar](https://connect.cityofbastrop.org/bastroptx/calendar),
+  with their owners' permission. Events describe public happenings, not people; an
+  organizer's name appears only as the public host of an event.
 - **No YouTube or Google account data.** The app authenticates with API keys, not a
   user account. It cannot see any viewer's watch history, subscriptions, or any other
   personal YouTube data, and it never asks anyone to sign in to Google.
@@ -73,7 +75,7 @@ No third party serves content or advertisements through this app.
 The app submits link posts — a video's title, linking to that video on YouTube — to the
 subreddit it is installed in, under the app's own account. When the events digest is
 on, it also submits one text post a day listing that day's and the next day's events,
-with links to each event's page on bastropcountycalendar.com. When moderators turn on
+with links to each event's page on its source's site. When moderators turn on
 pinning, it also pins that post and unpins the previous day's. Those posts are the only things it writes
 anywhere.
 

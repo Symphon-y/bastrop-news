@@ -152,3 +152,44 @@ function matchLabels(existingLabels) {
   });
   return { bySlug: ids, toCreate: toCreate, notes: notes };
 }
+
+/**
+ * The City of Bastrop calendar has no category field (its "ontology" text is a
+ * free-form audience taxonomy), so city events are categorised from their title, then
+ * their organizer. Rules are tried in order; the first match wins, which is why music
+ * comes before food ("Wine Not? Wednesdays + Live Music").
+ */
+var CITY_CATEGORY_RULES = [
+  { slug: 'government-civic', pattern: /\b(council|commission|board|committee|zoning|hearing)\b/i },
+  { slug: 'music', pattern: /live music|concert|\bopry\b|\bband\b|drum circle|open mic|karaoke|\bchoir\b/i },
+  { slug: 'markets-shopping', pattern: /farmer'?s'? market|farm stand|\bmarket\b|\bvendors?\b/i },
+  { slug: 'family-kids', pattern: /\b(tweens?|teens?|kids?|children|family|preschool|toddlers?|storytime)\b/i },
+  { slug: 'arts-entertainment', pattern: /\b(trivia|bingo|movie|film|theat(er|re))\b/i },
+  { slug: 'sports-outdoors', pattern: /\b(hike|trail|nature|paddle|kayak|5k|run)\b/i },
+  { slug: 'health-wellness', pattern: /\b(yoga|fitness|zumba|wellness|health|meditation)\b/i },
+  { slug: 'food-drink', pattern: /\b(burger|happy hour|wine|beer|brew\w*|dinner|lunch|tasting)\b/i },
+  { slug: 'education', pattern: /\b(class|workshop|club|conversation|lesson|book|knit\w*|sew\w*|fiber|craft)\b/i },
+];
+
+/** The city's account for official meetings; everything it posts is civic, whatever the title. */
+var CITY_MEETINGS_ORGANIZER = /public meetings/i;
+
+/** Fallbacks when the title says nothing, e.g. "Lighting of the Pines". */
+var CITY_ORGANIZER_CATEGORIES = [
+  { slug: 'education', pattern: /public library/i },
+  { slug: 'community', pattern: /parks (&|and) recreation/i },
+];
+
+/** Canonical category slug for a City of Bastrop event, or null when nothing fits. */
+function cityCategory(title, organizer) {
+  if (CITY_MEETINGS_ORGANIZER.test(String(organizer || ''))) return 'government-civic';
+  return firstMatch(CITY_CATEGORY_RULES, title) || firstMatch(CITY_ORGANIZER_CATEGORIES, organizer);
+}
+
+function firstMatch(rules, text) {
+  var value = String(text || '');
+  for (var i = 0; i < rules.length; i++) {
+    if (rules[i].pattern.test(value)) return rules[i].slug;
+  }
+  return null;
+}

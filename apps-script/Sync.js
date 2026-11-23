@@ -1,7 +1,8 @@
 /**
- * Copies bastropcountycalendar.com's events into a public Google Calendar, labelled by
- * category. Run daily at 5 AM Central by the trigger installTrigger() creates, ahead of
- * the Devvit app's 7 AM digest. Setup: README.md.
+ * Copies events from bastropcountycalendar.com and, when enabled, the City of Bastrop's
+ * Community Calendar into a public Google Calendar, labelled by category. Run daily at
+ * 5 AM Central by the trigger installTrigger() creates, ahead of the Devvit app's 7 AM
+ * digest. Setup: README.md.
  */
 
 var WINDOW_DAYS = 45;
@@ -21,18 +22,94 @@ var CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 /** Required on event writes for eventLabelId to be applied. */
 var LABEL_QUERY = { eventLabelVersion: 1 };
 
+/**
+ * Sources in priority order: when two list the same event, the earlier one's copy is
+ * kept. Functions from other files are called through wrappers because Apps Script
+ * does not guarantee file load order, so they may not exist yet when this is built. A required source failing fails the run; an optional one is skipped, and its
+ * events are left as they are until it can be read again.
+ */
+var SOURCE_READERS = [
+  {
+    key: 'bcc',
+    required: true,
+    enabled: function () {
+      return true;
+    },
+    read: function (today, windowEnd) {
+      var response = UrlFetchApp.fetch(countyEventsUrl(today, windowEnd), { muteHttpExceptions: true });
+      if (response.getResponseCode() !== 200) {
+        throw new Error('County source fetch failed: HTTP ' + response.getResponseCode());
+      }
+      return countyRecords(JSON.parse(response.getContentText()));
+    },
+    parse: function (record) {
+      return parseSourceEvent(record);
+    },
+    rawCategory: function (record) {
+      return String(record.category);
+    },
+  },
+  {
+    key: 'cob',
+    required: false,
+    enabled: function (properties) {
+      return properties.getProperty(CITY_SOURCE_PROPERTY) === 'on';
+    },
+    read: function (today, windowEnd) {
+      return fetchCityEvents(today, windowEnd);
+    },
+    parse: function (record) {
+      return parseCityRecord(record);
+    },
+    rawCategory: function () {
+      return '(uncategorised city event)';
+    },
+  },
+];
+
+/**
+ * Reads every enabled source. `fetched` marks the sources that answered with at least
+ * one record: only those may have events deleted, so an outage or a silently empty
+ * response never wipes a source's events from the calendar.
+ */
+function readSources(properties, today, windowEnd, counts) {
+  var events = [];
+  var fetched = {};
+  var activeSourceIds = {};
+  var unknownCategories = {};
+  SOURCE_READERS.forEach(function (reader) {
+    if (!reader.enabled(properties)) return;
+    var records;
+    try {
+      records = reader.read(today, windowEnd);
+    } catch (error) {
+      if (reader.required) throw error;
+      console.warn('skipping source ' + reader.key + ' this run: ' + error);
+      counts.skippedSources.push(reader.key);
+      return;
+    }
+    counts.fetched[reader.key] = records.length;
+    if (records.length > 0) fetched[reader.key] = true;
+    records.forEach(function (record) {
+      var normalized = reader.parse(record);
+      if (!normalized) {
+        counts.unparseable++;
+        return;
+      }
+      activeSourceIds[normalized.sourceId] = true;
+      if (!inWindow(normalized, today, windowEnd)) return;
+      if (!normalized.category) unknownCategories[reader.rawCategory(record)] = true;
+      events.push(normalized);
+    });
+  });
+  return { events: events, fetched: fetched, activeSourceIds: activeSourceIds, unknownCategories: unknownCategories };
+}
+
 function syncEvents() {
   var startedAt = Date.now();
   var properties = PropertiesService.getScriptProperties();
   var calendarId = properties.getProperty('CALENDAR_ID');
   if (!calendarId) throw new Error('Set the CALENDAR_ID script property (Project Settings > Script properties).');
-
-  var response = UrlFetchApp.fetch(SOURCE_URL, { muteHttpExceptions: true });
-  if (response.getResponseCode() !== 200) {
-    throw new Error('Source fetch failed: HTTP ' + response.getResponseCode());
-  }
-  var records = JSON.parse(response.getContentText());
-  if (!Array.isArray(records)) throw new Error('Source did not return a JSON array');
 
   var now = new Date();
   var today = Utilities.formatDate(now, SOURCE_TIME_ZONE, 'yyyy-MM-dd');
@@ -50,24 +127,20 @@ function syncEvents() {
     labeled: 0,
     unlabeled: 0,
     labelsCreated: labels.created,
+    duplicates: 0,
+    fetched: {},
+    skippedSources: [],
   };
-  var unknownCategories = {};
-  var activeSourceIds = {};
+  var read = readSources(properties, today, windowEnd, counts);
+  var deduped = dedupeEvents(read.events);
+  counts.duplicates = deduped.dropped;
   var desired = {};
-  records.forEach(function (record) {
-    var normalized = parseSourceEvent(record);
-    if (!normalized) {
-      if (record && record.status === 'active') counts.unparseable++;
-      return;
-    }
-    activeSourceIds[normalized.sourceId] = true;
-    if (!inWindow(normalized, today, windowEnd)) return;
-    desired[calendarIdFor(normalized.sourceId)] = normalized;
+  deduped.kept.forEach(function (normalized) {
+    desired[calendarIdFor(normalized.sourceId, normalized.source)] = normalized;
     if (normalized.category && labels.bySlug[normalized.category]) {
       counts.labeled++;
     } else {
       counts.unlabeled++;
-      unknownCategories[String(record.category)] = true;
     }
   });
 
@@ -133,13 +206,10 @@ function syncEvents() {
     counts.updated++;
   });
 
-  // Only events whose source record is gone or inactive are removed. Anything merely
-  // outside the window is left alone, so past events stay on the calendar.
+  // Only events their source no longer lists are removed (isOrphan in Parse.js).
+  // Anything outside the window is left alone, so past events stay on the calendar.
   Object.keys(existing).forEach(function (id) {
-    var current = existing[id];
-    if (current.status === 'cancelled') return;
-    var stored = current.extendedProperties && current.extendedProperties.private;
-    if (!stored || stored.source !== ID_PREFIX || activeSourceIds[stored.sourceId]) return;
+    if (!isOrphan(existing[id], read.fetched, read.activeSourceIds, today, windowEnd)) return;
     if (!canWrite()) return;
     var removed = calendarRequest('delete', eventsPath + '/' + id);
     if (removed.code !== 410) calendarOk(removed, 'events.delete');
@@ -147,7 +217,7 @@ function syncEvents() {
   });
 
   saveSuppressed(properties, suppressed);
-  var unknown = Object.keys(unknownCategories);
+  var unknown = Object.keys(read.unknownCategories);
   if (unknown.length > 0) console.log('categories with no label: ' + unknown.join(', '));
   console.log('syncEvents ' + today + ': ' + JSON.stringify(counts));
   return counts;
@@ -218,8 +288,9 @@ function ensureLabels(calendarId) {
 
 /**
  * Every event this script owns in the sync window, including cancelled ones.
- * Filtering by id prefix rather than privateExtendedProperty matters: deleted events
- * come back without their properties, and they are how mod deletions are detected.
+ * Filtering by id prefix (sourceKeyForId) rather than privateExtendedProperty matters:
+ * deleted events come back without their properties, and they are how mod deletions
+ * are detected.
  */
 function listOwnedEvents(calendarId, now) {
   var owned = {};
@@ -232,13 +303,15 @@ function listOwnedEvents(calendarId, now) {
         timeMax: new Date(now.getTime() + (WINDOW_DAYS + 2) * 86400000).toISOString(),
         showDeleted: true,
         singleEvents: true,
+        // Local offsets, so isOrphan compares dates in the same zone as the window.
+        timeZone: SOURCE_TIME_ZONE,
         maxResults: 2500,
         pageToken: pageToken,
       }),
       'events.list',
     );
     (page.items || []).forEach(function (item) {
-      if (item.id && item.id.indexOf(ID_PREFIX) === 0) owned[item.id] = item;
+      if (item.id && sourceKeyForId(item.id)) owned[item.id] = item;
     });
     pageToken = page.nextPageToken;
   } while (pageToken);
@@ -261,8 +334,8 @@ function saveSuppressed(properties, suppressed) {
 }
 
 /**
- * Run once by hand. Replaces any existing syncEvents trigger with a daily one. One fetch
- * a day keeps the load on bastropcountycalendar.com minimal; Apps Script runs it at some
+ * Run once by hand. Replaces any existing syncEvents trigger with a daily one. One read
+ * of each source a day keeps the load on them minimal; Apps Script runs it at some
  * point within the SYNC_HOUR hour.
  */
 function installTrigger() {

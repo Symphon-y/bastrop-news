@@ -113,6 +113,19 @@ describe('DailyDigestFormatter', () => {
     expect(body).toContain('[Subscribe to the calendar](https://calendar.google.com/calendar/embed?src=x)');
   });
 
+  it('credits the City of Bastrop calendar only when its events are listed', () => {
+    const county = formatter.format(digestOf([event({ id: 'a', url: 'https://bastropcountycalendar.com/events/a' })]));
+    const withCity = formatter.format(
+      digestOf([event({ id: 'c', url: 'https://connect.cityofbastrop.org/bastroptx/260230141' })]),
+    );
+
+    expect(county.body).not.toContain('City of Bastrop');
+    expect(withCity.body).toContain(
+      '*Events from [Bastrop County Calendar](https://bastropcountycalendar.com) and the ' +
+        '[City of Bastrop Community Calendar](https://connect.cityofbastrop.org/bastroptx/calendar) · [Subscribe',
+    );
+  });
+
   it('escapes markdown in titles and venues', () => {
     const { body } = formatter.format(digestOf([event({ id: 'a', title: 'Trivia *Night* [21+]', location: 'Pub_House' })]));
 
