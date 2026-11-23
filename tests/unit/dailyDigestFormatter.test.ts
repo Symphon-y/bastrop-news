@@ -126,6 +126,26 @@ describe('DailyDigestFormatter', () => {
     );
   });
 
+  it('summarizes worship services in one line per day, linking the Faith calendar', () => {
+    const worship = (id: string, start: string) => event({ id, start: new Date(start), end: new Date(new Date(start).getTime() + 3_600_000), digestGroup: 'worship' });
+    const { body } = formatter.format(
+      digestOf([
+        event({ id: 'a', title: 'Concert' }),
+        worship('w1', '2026-11-22T15:00:00Z'),
+        worship('w2', '2026-11-22T16:00:00Z'),
+        worship('w3', '2026-11-23T15:00:00Z'),
+      ]),
+    );
+
+    expect(body).toContain(
+      '* **12:00 PM**: Concert\n* *⛪ 2 worship services today: [see the Faith calendar](https://bastropcountycalendar.com/categories/faith)*',
+    );
+    expect(body).toContain(
+      '### Tomorrow: Monday, Nov 23\n* *⛪ 1 worship service tomorrow: [see the Faith calendar](https://bastropcountycalendar.com/categories/faith)*',
+    );
+    expect(body).not.toContain('w1');
+  });
+
   it('escapes markdown in titles and venues', () => {
     const { body } = formatter.format(digestOf([event({ id: 'a', title: 'Trivia *Night* [21+]', location: 'Pub_House' })]));
 

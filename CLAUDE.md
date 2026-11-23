@@ -53,7 +53,7 @@ to Reddit; see its README.
 
 ## Testing
 
-`npm test` — 213 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
+`npm test` — 222 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
 Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
 constructor injection and are tested against in-memory fakes in `tests/fakes/`.
 `apps-script/*.js` are plain Apps Script (global declarations, no modules).
@@ -113,6 +113,12 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   `timezone` is Central), it repeats some occurrences under different ids, and
   `isApproved` is false on everything the city shows. It is off unless the
   `CITY_SOURCE_ENABLED` script property is `on`.
+- **Worship services reach the digest as a count, via a shared extended property.**
+  The sync sets `extendedProperties.shared.digestGroup = "worship"` on county records
+  tagged `worship` (shared, not private, so the API-key read in
+  `googleCalendarEventSource.ts` sees it), and `buildDailyDigest` counts those instead
+  of listing them. The source's URLs and titles do not identify them reliably; the tag
+  does.
 - **A source is only ever allowed to delete its own events, and only after a
   non-empty read.** `isOrphan` checks the id prefix (`bcc`, `bcob`) against the sources
   that answered this run. Keep it that way: a vendor outage that returns `[]` would

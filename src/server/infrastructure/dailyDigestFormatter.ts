@@ -1,6 +1,6 @@
 import type { DailyDigest, DigestEntry } from '../application/digestSchedule.js';
 import type { DigestFormatter, FormattedTextPost } from '../application/ports.js';
-import { CITY_SOURCE, SOURCE_SITE_LINKS, SOURCE_SITE_URL } from '../eventsConfig.js';
+import { CITY_SOURCE, FAITH_CALENDAR_URL, SOURCE_SITE_LINKS, SOURCE_SITE_URL } from '../eventsConfig.js';
 import { REDDIT_TITLE_MAX_LENGTH } from './passthroughFormatter.js';
 
 export const REDDIT_TEXT_MAX_LENGTH = 40_000;
@@ -29,16 +29,29 @@ export class DailyDigestFormatter implements DigestFormatter {
 
     // In priority order: when the post is too long, the last sections are cut first.
     const sections: Section[] = [
-      { heading: `Today: ${this.shortDay(digest.today.start)}`, lines: digest.todayEvents.map((e) => this.dayLine(e)) },
+      {
+        heading: `Today: ${this.shortDay(digest.today.start)}`,
+        lines: [...digest.todayEvents.map((e) => this.dayLine(e)), ...this.worshipLine(digest.todayWorship, 'today')],
+      },
       { heading: 'Ongoing', lines: digest.ongoing.map((e) => this.line(e, null)) },
       {
         heading: `Tomorrow: ${this.shortDay(digest.tomorrow.start)}`,
-        lines: digest.tomorrowEvents.map((e) => this.dayLine(e)),
+        lines: [
+          ...digest.tomorrowEvents.map((e) => this.dayLine(e)),
+          ...this.worshipLine(digest.tomorrowWorship, 'tomorrow'),
+        ],
       },
     ].filter((section) => section.lines.length > 0);
 
+    // Counted in rendered lines, as assemble() counts what it shows; a worship summary is one.
     const total = sections.reduce((sum, section) => sum + section.lines.length, 0);
     return { title, body: this.assemble(sections, this.footer(digest), total) };
+  }
+
+  private worshipLine(count: number, when: 'today' | 'tomorrow'): string[] {
+    if (count === 0) return [];
+    const noun = count === 1 ? 'worship service' : 'worship services';
+    return [`* *⛪ ${count} ${noun} ${when}: [see the Faith calendar](${FAITH_CALENDAR_URL})*`];
   }
 
   private date(instant: Date, options: Intl.DateTimeFormatOptions): string {

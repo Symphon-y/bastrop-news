@@ -28,19 +28,22 @@ Each run:
    - All-day end dates are inclusive.
    - Records with malformed dates are skipped and counted.
    - City events with a one- or two-word title get their organizer added ("TRIVIA at Bastrop Beer Company").
-3. **Drops duplicates** (`dedupeEvents`): exact repeats within a source, and a city
+3. **Marks routine worship services:** county records tagged `worship` get
+   `digestGroup: "worship"` as a shared extended property, which the digest turns into
+   one count line instead of ~58 Sunday listings.
+4. **Drops duplicates** (`dedupeEvents`): exact repeats within a source, and a city
    event with the same title on the same day as a county one. Counted as `duplicates`.
-4. **Gives each event a deterministic calendar id:** a source prefix (`bcc` for the
+5. **Gives each event a deterministic calendar id:** a source prefix (`bcc` for the
    county, `bcob` for the city) + SHA-256 of the source id. That makes every run idempotent.
-5. **Labels each event by category** (`Labels.js`). See *Labels* below.
-6. **Writes changes to the calendar.**
+6. **Labels each event by category** (`Labels.js`). See *Labels* below.
+7. **Writes changes to the calendar.**
    - Creates events that are missing.
    - Updates events whose source `updatedAt` changed.
    - Deletes an event only when its own source answered this run, with at least one
      event, and no longer lists it (`isOrphan`). An outage or an empty response never
      deletes anything.
    - Past events are left alone.
-7. **Logs a summary**, e.g. `{"created":12,"updated":1,"deleted":0,"suppressed":1,"duplicates":3,"fetched":{"bcc":614,"cob":116},"skippedSources":[],...}`.
+8. **Logs a summary**, e.g. `{"created":12,"updated":1,"deleted":0,"suppressed":1,"duplicates":3,"fetched":{"bcc":614,"cob":116},"skippedSources":[],...}`.
 
 **Deleting an event in Google Calendar suppresses it.** The script sees the deleted
 entry, remembers it, and never recreates it, so it also never reaches a digest. That is

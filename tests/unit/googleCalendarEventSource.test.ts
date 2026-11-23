@@ -28,6 +28,20 @@ const FIXTURE = {
 };
 
 describe('parseCalendarEvents', () => {
+  it('carries the digest group the sync shares on routine services', () => {
+    const [worship, plain] = parseCalendarEvents(
+      {
+        items: [
+          { ...FIXTURE.items[0], id: 'w', extendedProperties: { shared: { digestGroup: 'worship' } } },
+          { ...FIXTURE.items[0], id: 'p', extendedProperties: { shared: { digestGroup: '' } } },
+        ],
+      },
+      TZ,
+    );
+    expect(worship.digestGroup).toBe('worship');
+    expect(plain.digestGroup).toBeUndefined();
+  });
+
   it('parses timed events with their source link', () => {
     const [timed] = parseCalendarEvents(FIXTURE, TZ);
     expect(timed).toEqual({

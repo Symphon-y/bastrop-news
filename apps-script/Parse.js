@@ -146,6 +146,8 @@ function normalizeEvent(fields) {
     description: description.slice(0, DESCRIPTION_MAX_LENGTH),
     location: location || null,
     pageUrl: fields.pageUrl,
+    /** Events the digest summarizes as a count instead of listing (e.g. "worship"); '' otherwise. */
+    digestGroup: fields.digestGroup || '',
     allDay: allDay,
     start: startTime,
     end: endTime,
@@ -169,6 +171,9 @@ function parseSourceEvent(record) {
     pageUrl: record.url || EVENT_PAGE_BASE + (record.slug || sourceId),
     updatedAt: record.updatedAt,
     category: canonicalCategory(record.category),
+    // The site tags its recurring church services "worship" (hundreds a month, ~58 on a
+    // Sunday); one-off church events such as concerts are not tagged.
+    digestGroup: (record.tags || []).indexOf('worship') >= 0 ? 'worship' : '',
   });
 }
 
@@ -297,6 +302,8 @@ function toCalendarResource(normalized, labelId) {
         sourceUpdatedAt: normalized.updatedAt,
         sourceCategory: normalized.category || '',
       },
+      // Shared, not private, so the Devvit app reading the public calendar sees it.
+      shared: { digestGroup: normalized.digestGroup || '' },
     },
   };
   if (normalized.location) resource.location = normalized.location;

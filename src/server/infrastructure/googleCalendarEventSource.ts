@@ -20,6 +20,7 @@ export interface CalendarEventsResponse {
     start?: EventTime;
     end?: EventTime;
     source?: { url?: string };
+    extendedProperties?: { shared?: { digestGroup?: string } };
   }[];
   nextPageToken?: string;
 }
@@ -40,6 +41,7 @@ export function parseCalendarEvents(
     const start = toInstant(item.start, timeZone);
     const end = toInstant(item.end, timeZone);
     if (start === null || end === null) continue;
+    const digestGroup = item.extendedProperties?.shared?.digestGroup || undefined;
     events.push({
       id: item.id,
       title: item.summary?.trim() || '(untitled event)',
@@ -48,6 +50,7 @@ export function parseCalendarEvents(
       start,
       end,
       allDay: item.start?.date !== undefined && item.start?.dateTime === undefined,
+      ...(digestGroup ? { digestGroup } : {}),
     });
   }
   return events;

@@ -19,6 +19,9 @@ export const CITY_SOURCE = {
   pageUrlPrefix: 'https://connect.cityofbastrop.org/',
 } as const;
 
+/** Where the digest's worship-service count points. */
+export const FAITH_CALENDAR_URL = 'https://bastropcountycalendar.com/categories/faith';
+
 /** The source site's own filtered views, linked from every digest for planning ahead. */
 export const SOURCE_SITE_LINKS: readonly { label: string; url: string }[] = [
   { label: 'Today', url: `${SOURCE_SITE_URL}/today` },

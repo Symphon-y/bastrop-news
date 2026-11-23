@@ -116,6 +116,12 @@ describe('parseSourceEvent', () => {
     );
   });
 
+  it('marks routine worship services so the digest can summarize them', () => {
+    expect(parseSourceEvent(record({ tags: ['Bastrop', 'church', 'faith', 'worship'] })).digestGroup).toBe('worship');
+    expect(parseSourceEvent(record({ tags: ['Bastrop'] })).digestGroup).toBe('');
+    expect(parseSourceEvent(record({})).digestGroup).toBe('');
+  });
+
   it('tags the event with its source', () => {
     expect(parseSourceEvent(record({})).source).toBe('bcc');
   });
@@ -283,6 +289,12 @@ describe('toCalendarResource', () => {
     });
     expect(resource.id).toBeUndefined();
     expect(resource.eventLabelId).toBeUndefined();
+  });
+
+  it('shares the digest group, which public readers of the calendar can see', () => {
+    const resource = toCalendarResource(parseSourceEvent(record({ tags: ['worship'] })), null);
+    expect(resource.extendedProperties.shared).toEqual({ digestGroup: 'worship' });
+    expect(toCalendarResource(parseSourceEvent(record({})), null).extendedProperties.shared).toEqual({ digestGroup: '' });
   });
 
   it('sets the label when given one', () => {

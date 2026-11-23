@@ -255,6 +255,18 @@ describe('syncEvents', () => {
     expect(timed.start).toEqual({ dateTime: `${localDate(3)}T18:00:00`, timeZone: TZ });
   });
 
+  it('backfills the digest group on events synced before it existed', () => {
+    world.setCounty([countyEvent('mass', 'Sacred Heart Sunday Worship', 3, { tags: ['worship'] })]);
+    world.sync();
+    const id = world.live()[0].id;
+    // Simulate an event written by the previous version, without the shared property.
+    world.calendar.events.set(id, { ...world.calendar.events.get(id)!, extendedProperties: { private: world.calendar.events.get(id)!.extendedProperties.private } });
+
+    expect(world.sync().updated).toBe(1);
+    expect(world.calendar.events.get(id)!.extendedProperties.shared).toEqual({ digestGroup: 'worship' });
+    expect(world.sync().updated).toBe(0);
+  });
+
   it('removes an event its source dropped, and does not recreate one a moderator deleted', () => {
     world.sync();
     world.setCounty([countyEvent('fair', 'Holiday Fair', 5)]);

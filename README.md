@@ -48,6 +48,10 @@ time, venue, and a link to its page. The post has three sections:
   (`through Sat, Dec 26`), so a long-running listing does not crowd out the day's own
   events.
 - **Tomorrow:** a preview of events starting the next day.
+- **Worship services are counted, not listed.** The county site lists every church's
+  regular services, about 58 on a Sunday. Each day gets one line instead, "⛪ 58
+  worship services today", linking to the site's Faith calendar. One-off church events
+  such as concerts are listed normally.
 
 It ends with links to the source site's own Today, This weekend and This week pages, and
 to the public calendar.
@@ -309,7 +313,7 @@ sticky; a pin failure is logged and never undoes or repeats the post.
 
 ```
 npm install
-npm test           # 213 unit tests
+npm test           # 222 unit tests
 npm run typecheck
 npm run build      # esbuild -> dist/server/index.cjs
 ```

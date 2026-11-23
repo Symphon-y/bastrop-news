@@ -191,7 +191,10 @@ function syncEvents() {
     var sourceChanged = stored.sourceUpdatedAt !== normalized.updatedAt;
     // Events synced before labels existed have no sourceCategory, so this also backfills.
     var categoryChanged = stored.sourceCategory !== (normalized.category || '');
-    if (!sourceChanged && !categoryChanged) {
+    // Also backfills events written before the digest group existed.
+    var shared = (current.extendedProperties && current.extendedProperties.shared) || {};
+    var groupChanged = (shared.digestGroup || '') !== (normalized.digestGroup || '');
+    if (!sourceChanged && !categoryChanged && !groupChanged) {
       counts.unchanged++;
       return;
     }

@@ -7,4 +7,9 @@ export interface CalendarEvent {
   /** Exclusive, as Google Calendar reports it. */
   readonly end: Date;
   readonly allDay: boolean;
+  /**
+   * Set on routine listings the digest counts instead of listing, e.g. "worship". The
+   * Apps Script sync writes it as a shared extended property.
+   */
+  readonly digestGroup?: string;
 }

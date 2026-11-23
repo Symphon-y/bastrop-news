@@ -16,7 +16,16 @@ export interface DailyDigest {
   readonly ongoing: readonly DigestEntry[];
   /** Starting tomorrow, ordered like `todayEvents`. */
   readonly tomorrowEvents: readonly DigestEntry[];
+  /** Worship services starting today, counted rather than listed. */
+  readonly todayWorship: number;
+  readonly tomorrowWorship: number;
 }
+
+/**
+ * The county site lists every church's regular services, about 58 on a Sunday. Listed
+ * one by one they would bury the day's other events, so the digest gives a count.
+ */
+const WORSHIP_GROUP = 'worship';
 
 /**
  * Longer than any local day (25 hours on the fall-back day), so a one-day all-day event
@@ -58,9 +67,14 @@ export function buildDailyDigest(
   const todayEvents: DigestEntry[] = [];
   const ongoing: DigestEntry[] = [];
   const tomorrowEvents: DigestEntry[] = [];
+  let todayWorship = 0;
+  let tomorrowWorship = 0;
 
   for (const event of events) {
-    if (startsWithin(event, today)) {
+    if (event.digestGroup === WORSHIP_GROUP) {
+      if (startsWithin(event, today)) todayWorship += 1;
+      else if (startsWithin(event, tomorrow)) tomorrowWorship += 1;
+    } else if (startsWithin(event, today)) {
       todayEvents.push(toEntry(event));
     } else if (startsWithin(event, tomorrow)) {
       tomorrowEvents.push(toEntry(event));
@@ -76,5 +90,7 @@ export function buildDailyDigest(
     todayEvents: todayEvents.sort(byDayOrder),
     ongoing: ongoing.sort(bySoonestEnd),
     tomorrowEvents: tomorrowEvents.sort(byDayOrder),
+    todayWorship,
+    tomorrowWorship,
   };
 }

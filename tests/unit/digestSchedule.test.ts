@@ -111,6 +111,21 @@ describe('buildDailyDigest', () => {
     expect(all.sort()).toEqual(['market', 'noon', 'yoga']);
   });
 
+  it('counts worship services instead of listing them, for today and tomorrow', () => {
+    const worship = (id: string, start: string, end: string) => ({ ...event(id, start, end), digestGroup: 'worship' });
+    const digest = buildDailyDigest(TODAY, TOMORROW, [
+      worship('mass', '2026-11-22T15:00:00Z', '2026-11-22T16:00:00Z'),
+      worship('service', '2026-11-22T16:30:00Z', '2026-11-22T17:30:00Z'),
+      worship('monday', '2026-11-23T15:00:00Z', '2026-11-23T16:00:00Z'),
+      event('concert', '2026-11-22T18:00:00Z', '2026-11-22T19:00:00Z'),
+    ]);
+
+    expect(ids(digest.todayEvents)).toEqual(['concert']);
+    expect(digest.todayWorship).toBe(2);
+    expect(digest.tomorrowWorship).toBe(1);
+    expect(digest.tomorrowEvents).toEqual([]);
+  });
+
   it('treats an all-day event on the 25-hour fall-back day as a single day', () => {
     const fallBack = localDayBounds(new Date('2026-11-01T18:00:00Z'), TZ);
     const digest = buildDailyDigest(fallBack, nextLocalDay(fallBack, TZ), [

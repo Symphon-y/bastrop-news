@@ -89,6 +89,15 @@ describe('PostDailyDigestUseCase', () => {
     expect(digestStore.lastDate).toBe('2026-11-22');
   });
 
+  it('does not post a day whose only events are worship services', async () => {
+    const publisher = new FakePublisher();
+    const mass = { ...makeEvent('w', '2026-11-22T15:00:00Z', '2026-11-22T16:00:00Z'), digestGroup: 'worship' };
+    const result = await makeUseCase({ eventSource: new FakeEventSource([mass]), publisher }).run();
+
+    expect(result.status).toBe('no_events');
+    expect(publisher.textCalls).toHaveLength(0);
+  });
+
   it('posts a day with only ongoing events, counting them', async () => {
     const market = makeEvent('m', '2026-11-07T06:00:00Z', '2026-12-27T06:00:00Z');
     const result = await makeUseCase({ eventSource: new FakeEventSource([market]) }).run();
