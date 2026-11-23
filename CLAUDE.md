@@ -25,6 +25,7 @@ src/server/
 │   │                            Publisher, VideoFilter
 │   ├── checkAndPost.ts          CheckAndPostUseCase -- video ingest and posting
 │   ├── postDailyDigest.ts       PostDailyDigestUseCase -- one events digest a day
+│   ├── digestSchedule.ts        buildDailyDigest -- today / ongoing / tomorrow
 │   └── localDay.ts              local-day bounds in a time zone, DST-safe
 ├── infrastructure/              one adapter per port
 ├── channelsConfig.ts            watched channels (checked in, not secret)
@@ -40,13 +41,17 @@ the gate, while leaving ingest intact.
 
 `PostDailyDigestUseCase.run()` runs from an hourly cron but posts at most once per local
 (`America/Chicago`) day. Being due is decided in code, not by the cron, so the post
-stays at the same local hour across DST and a failure retries an hour later.
+stays at the same local hour across DST and a failure retries an hour later. It fetches
+today and tomorrow in one call; `buildDailyDigest` (pure) decides which section each
+event belongs to, and `DailyDigestFormatter` only renders. Pinning is a separate
+`PostPinner` port, optional, and runs after the day is marked so a pin failure can
+never cause a second post.
 `apps-script/` is a separate Google Apps Script that fills the calendar from
 bastropcountycalendar.com. It is never uploaded to Reddit; see its README.
 
 ## Testing
 
-`npm test` — 129 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
+`npm test` — 160 Vitest tests, no network and no Devvit runtime. Adapters that wrap a
 Devvit singleton (`RedditPublisher`, `RedisVideoQueueStore`) take their client by
 constructor injection and are tested against in-memory fakes in `tests/fakes/`.
 `apps-script/Labels.js` and `Parse.js` are plain Apps Script (global declarations, no
@@ -111,6 +116,12 @@ can be validated against `node_modules/@devvit/shared-types/schemas/config-file.
   calls the REST API directly. Declaring it is what enables the Calendar API on the
   script's hidden default Cloud project; remove it and every call fails with
   `HTTP 403 -- Google Calendar API has not been used in project …`.
+- **"Multi-day" means longer than 25 hours**, not "ends on a different date". That
+  threshold keeps an all-day event on the 25-hour fall-back day and an 8 PM–1 AM show
+  single-day, so neither gets a "through" date.
+- **Sticky needs the `moderator` Reddit scope** in `devvit.json`; the default `user`
+  scope cannot pin. Changing the scope may make moderators re-approve the app's
+  permissions on upgrade.
 - **Deleting an event in the calendar suppresses it.** The sync uses deterministic ids
   (`bcc` + SHA-256 of the source id) and never recreates a cancelled one. That is the
   moderator's way to keep a listing out of the digest.

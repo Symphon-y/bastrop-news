@@ -71,6 +71,11 @@ export function localDayBounds(now: Date, timeZone: string): LocalDay {
   };
 }
 
+/** The local day after `day`. Its `hour` is 0, since no clock reading produced it. */
+export function nextLocalDay(day: LocalDay, timeZone: string): LocalDay {
+  return { ...localDayBounds(day.end, timeZone), hour: 0 };
+}
+
 /** Local midnight for a `YYYY-MM-DD` string, e.g. a Google Calendar all-day `date`. */
 export function localDateToInstant(localDate: string, timeZone: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(localDate);

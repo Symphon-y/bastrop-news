@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDateToInstant, localDayBounds } from '../../src/server/application/localDay.js';
+import { localDateToInstant, localDayBounds, nextLocalDay } from '../../src/server/application/localDay.js';
 
 const TZ = 'America/Chicago';
 
@@ -42,6 +42,28 @@ describe('localDayBounds', () => {
   it('rolls over month and year ends', () => {
     const day = localDayBounds(new Date('2026-12-31T18:00:00Z'), TZ);
     expect(day.end.toISOString()).toBe('2027-01-01T06:00:00.000Z');
+  });
+});
+
+describe('nextLocalDay', () => {
+  it('returns the following local day, starting at midnight', () => {
+    const next = nextLocalDay(localDayBounds(new Date('2026-11-22T15:00:00Z'), TZ), TZ);
+    expect(next.localDate).toBe('2026-11-23');
+    expect(next.hour).toBe(0);
+    expect(next.start.toISOString()).toBe('2026-11-23T06:00:00.000Z');
+    expect(next.end.toISOString()).toBe('2026-11-24T06:00:00.000Z');
+  });
+
+  it('returns a 23-hour day when tomorrow springs forward', () => {
+    const next = nextLocalDay(localDayBounds(new Date('2027-03-13T18:00:00Z'), TZ), TZ);
+    expect(next.localDate).toBe('2027-03-14');
+    expect(next.end.getTime() - next.start.getTime()).toBe(23 * 3_600_000);
+  });
+
+  it('returns a 25-hour day when tomorrow falls back', () => {
+    const next = nextLocalDay(localDayBounds(new Date('2026-10-31T18:00:00Z'), TZ), TZ);
+    expect(next.localDate).toBe('2026-11-01');
+    expect(next.end.getTime() - next.start.getTime()).toBe(25 * 3_600_000);
   });
 });
 

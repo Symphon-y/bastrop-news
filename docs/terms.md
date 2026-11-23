@@ -44,10 +44,12 @@ and venues should be confirmed with the organizer.
   minimum interval apart regardless of how often the app checks.
 - Posts are plain link posts — the video's title, linking to the video — submitted under
   the app's own account.
-- When the events digest is on, once each morning it reads the day's events from the
-  public events calendar and submits one text post listing them: each event's title,
-  time, and venue, with a link to its page. It posts at most one digest per day, and
-  none on a day with no events.
+- When the events digest is on, once each morning it reads today's and tomorrow's
+  events from the public events calendar and submits one text post listing them: each
+  event's title, time, and venue, with a link to its page. It posts at most one digest
+  per day, and none on a day with no events today.
+- When moderators turn on pinning, the app pins each day's digest and unpins the
+  previous day's. It never pins or unpins any other post.
 
 ## What the app does not do
 

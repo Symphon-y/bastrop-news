@@ -1,6 +1,6 @@
 import type { CalendarEvent } from '../domain/calendarEvent.js';
 import type { Video } from '../domain/video.js';
-import type { LocalDay } from './localDay.js';
+import type { DailyDigest } from './digestSchedule.js';
 
 export interface VideoSource {
   fetchLatest(): Promise<Video[]>;
@@ -42,6 +42,15 @@ export interface DigestStore {
   /** `YYYY-MM-DD` of the last local day a digest was handled for, or null. */
   lastDigestDate(): Promise<string | null>;
   markDigestPosted(localDate: string): Promise<void>;
+  /** The digest post currently pinned by the app, so the next one can replace it. */
+  pinnedPostId(): Promise<string | null>;
+  setPinnedPostId(postId: string | null): Promise<void>;
+}
+
+/** Kept apart from Publisher: pinning is optional and needs moderator permission. */
+export interface PostPinner {
+  pin(postId: string): Promise<void>;
+  unpin(postId: string): Promise<void>;
 }
 
 export interface FormattedTextPost {
@@ -50,5 +59,5 @@ export interface FormattedTextPost {
 }
 
 export interface DigestFormatter {
-  format(day: LocalDay, events: readonly CalendarEvent[]): FormattedTextPost;
+  format(digest: DailyDigest): FormattedTextPost;
 }

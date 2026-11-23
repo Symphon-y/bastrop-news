@@ -2,8 +2,11 @@ import {
   PublishError,
   type FormattedPost,
   type FormattedTextPost,
+  type PostPinner,
   type Publisher,
 } from '../application/ports.js';
+
+type PostId = `t3_${string}`;
 
 /** The slice of @devvit/reddit's RedditClient this adapter uses, narrow enough for
  * tests to supply a plain fake. */
@@ -15,9 +18,10 @@ export interface RedditClientLike {
       runAs?: 'USER' | 'APP';
     } & ({ url: string } | { text: string }),
   ): Promise<{ id: string }>;
+  getPostById(id: PostId): Promise<{ sticky(): Promise<void>; unsticky(): Promise<void> }>;
 }
 
-export class RedditPublisher implements Publisher {
+export class RedditPublisher implements Publisher, PostPinner {
   constructor(private readonly reddit: RedditClientLike) {}
 
   async submitLinkPost(subreddit: string, post: FormattedPost): Promise<string> {
@@ -44,6 +48,28 @@ export class RedditPublisher implements Publisher {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new PublishError(`Failed to submit post to r/${subreddit}: ${message}`);
+    }
+  }
+
+  /** Uses the next free sticky slot, or the bottom one when both are taken. */
+  async pin(postId: string): Promise<void> {
+    await this.moderate(postId, 'pin', (post) => post.sticky());
+  }
+
+  async unpin(postId: string): Promise<void> {
+    await this.moderate(postId, 'unpin', (post) => post.unsticky());
+  }
+
+  private async moderate(
+    postId: string,
+    action: string,
+    apply: (post: { sticky(): Promise<void>; unsticky(): Promise<void> }) => Promise<void>,
+  ): Promise<void> {
+    try {
+      await apply(await this.reddit.getPostById(postId as PostId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new PublishError(`Failed to ${action} post ${postId}: ${message}`);
     }
   }
 }

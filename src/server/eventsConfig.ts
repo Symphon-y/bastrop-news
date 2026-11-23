@@ -7,6 +7,15 @@
 export const EVENTS_CALENDAR_ID =
   '64f3a4b92fe6b7557de303387401e2e1b347a97a816bb023b4157f8cce256651@group.calendar.google.com';
 
+export const SOURCE_SITE_URL = 'https://bastropcountycalendar.com';
+
+/** The source site's own filtered views, linked from every digest for planning ahead. */
+export const SOURCE_SITE_LINKS: readonly { label: string; url: string }[] = [
+  { label: 'Today', url: `${SOURCE_SITE_URL}/today` },
+  { label: 'This weekend', url: `${SOURCE_SITE_URL}/this-weekend` },
+  { label: 'This week', url: `${SOURCE_SITE_URL}/calendar/week` },
+];
+
 /** The source site's events carry naive local times in this zone. */
 export const EVENTS_TIME_ZONE = 'America/Chicago';
 

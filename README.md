@@ -39,9 +39,17 @@ Three rules keep it quiet, and they matter more than the checking:
 ### Daily events digest
 
 When the `eventsDigest` setting is on, the app also posts **one text post each morning**
-titled *Happening today in Bastrop County: Sunday, November 22*. It lists that day's
-events with time, venue, and a link to each event's page. All-day and multi-day events
-come first, then timed events in order.
+titled *Happening today in Bastrop County: Sunday, November 22*. Each event has its
+time, venue, and a link to its page. The post has three sections:
+
+- **Today:** all-day events first, then timed ones in order.
+- **Ongoing:** multi-day events that started earlier, one line each with their last day
+  (`through Sat, Dec 26`), so a long-running listing does not crowd out the day's own
+  events.
+- **Tomorrow:** a preview of events starting the next day.
+
+It ends with links to the source site's own Today, This weekend and This week pages, and
+to the public calendar.
 
 - **The events come from a public Google Calendar.** A separate Google Apps Script
   (`apps-script/`) fills that calendar each morning at 5 AM from
@@ -50,7 +58,10 @@ come first, then timed events in order.
 - **At most one digest per day.** The app checks hourly. It posts on the first check at
   or after `eventsDigestHour` (7 AM Central by default), and remembers the date it
   posted so it never posts twice in a day. A failed post is retried the next hour.
-- **No events, no post.** On a day with nothing listed, the app posts nothing.
+- **No events, no post.** When nothing is listed for today (tomorrow alone does not
+  count), the app posts nothing.
+- **Optional sticky.** With `stickyDigest` on, each digest is pinned and the previous
+  one unpinned, so the subreddit always shows the current day. It is off by default.
 - **Moderators can remove a listing** by deleting it from the Google Calendar. The sync
   then leaves it out for good, so it never appears in a digest.
 
@@ -117,8 +128,9 @@ the events digest is on.
 | `eventsDigest` | `off` | `on` to post the daily events digest. |
 | `googleCalendarApiKey` | — | Google Cloud API key with the Google Calendar API enabled. Required when `eventsDigest` is on. May be the same key as `youtubeApiKey`. |
 | `eventsDigestHour` | `7` | Local (Central) hour, 0–23, from which the day's digest is posted. |
+| `stickyDigest` | `off` | `on` to pin each day's digest in place of the previous one. Takes a free sticky slot, or replaces the bottom sticky when both are in use. |
 
-`eventsDigest` is a string for the same reason as `dryRun`.
+`eventsDigest` and `stickyDigest` are strings for the same reason as `dryRun`.
 
 There is no setting for which subreddit to post to. The app posts to the subreddit it is
 installed in, so it cannot post anywhere else.
@@ -191,7 +203,7 @@ The following domains are requested for this app:
   RSS feeds, which are served from `www.youtube.com`, so that every YouTube request goes
   to one documented API.
 - `www.googleapis.com` — the official Google Calendar API v3, used read-only to list
-  the current day's events on one public calendar for the daily events digest. Only
+  today's and tomorrow's events on one public calendar for the daily events digest. Only
   `GET /calendar/v3/calendars/{calendarId}/events` is called, with an API key. It is
   normally called once a day, or hourly while `dryRun` is on. No OAuth and no user data
   are involved. It is used only when a moderator turns the digest on.
@@ -201,6 +213,10 @@ The following domains are requested for this app:
 - **Posts are attributed to the app account** (`runAs: 'APP'` in
   `src/server/infrastructure/redditPublisher.ts`). The app does not take actions on
   behalf of any redditor, and requests no such permission.
+- **The `moderator` Reddit scope is used only to sticky the digest.** Pinning today's
+  digest and unpinning yesterday's (`pin`/`unpin` in `redditPublisher.ts`) are moderator
+  actions. They run only when a moderator sets `stickyDigest` to `on`, and only on the
+  app's own digest posts.
 - **The app reads no Reddit user data.** It reads public YouTube metadata and, when the
   digest is on, public calendar events. It writes link posts and at most one daily text
   post. It does not read profiles, comments, votes, or messages.
@@ -214,7 +230,7 @@ The following domains are requested for this app:
   neither "YouTube" nor "YT".
 - **Stored data expires after 30 days**, matching YouTube's Developer Policies cap on
   retaining non-authorized API data. The events digest stores no event data at all,
-  only the date of the last digest it posted.
+  only the date of the last digest it posted and, when sticky is on, that post's id.
 - **Event listings are used with permission** from bastropcountycalendar.com's owner,
   and each event in a digest links back to its page there.
 - **Posting is rate-limited in the app itself**, independently of the check schedule —
@@ -242,6 +258,7 @@ src/server/
 │   │                            Publisher, VideoFilter
 │   ├── checkAndPost.ts          CheckAndPostUseCase -- video ingest and posting
 │   ├── postDailyDigest.ts       PostDailyDigestUseCase -- one events digest a day
+│   ├── digestSchedule.ts        sorts events into today, ongoing and tomorrow
 │   └── localDay.ts              local-day bounds in a time zone, DST-safe
 ├── infrastructure/
 │   ├── youtubeDataApiSource.ts  YouTube Data API v3
@@ -249,13 +266,13 @@ src/server/
 │   ├── redisVideoQueueStore.ts  Redis-backed queue, dedup, and time gate
 │   ├── googleCalendarEventSource.ts  Google Calendar API v3, public calendar
 │   ├── dailyDigestFormatter.ts  digest title and markdown body
-│   ├── redisDigestStore.ts      date of the last digest
-│   ├── redditPublisher.ts       wraps submitPost (link and text posts)
+│   ├── redisDigestStore.ts      date and pinned post id of the last digest
+│   ├── redditPublisher.ts       submitPost (link and text posts), sticky/unsticky
 │   ├── videoFilters.ts          AcceptAllFilter, KeywordFilter, LandscapeOnlyFilter
 │   ├── filteredVideoSource.ts   VideoSource + VideoFilter -> VideoSource
 │   └── passthroughFormatter.ts  title and url, truncated to Reddit's limit
 ├── channelsConfig.ts            watched channels (checked in, not secret)
-├── eventsConfig.ts              events calendar id and time zone
+├── eventsConfig.ts              events calendar id, time zone, source-site links
 ├── config.ts                    settings and the target subreddit
 └── index.ts                     composition root and scheduler endpoints
 
@@ -275,14 +292,17 @@ apps-script/                     Google Apps Script: site events -> public calen
 
 `PostDailyDigestUseCase.run()` is called hourly and is independent of the video flow. It
 works out the local date and hour in `America/Chicago`. If the digest is due and has not
-been posted today, it reads that local day's events (midnight to midnight, so DST days
-are 23 or 25 hours) and posts them as one text post.
+been posted today, it reads today's and tomorrow's events (local midnight to midnight,
+so DST days are 23 or 25 hours). `buildDailyDigest` sorts them into today, ongoing and
+tomorrow, each event in one section only, and the formatter renders them as one text
+post. With a pinner configured, the new post then replaces the previous digest as a
+sticky; a pin failure is logged and never undoes or repeats the post.
 
 ## Development
 
 ```
 npm install
-npm test           # 129 unit tests
+npm test           # 160 unit tests
 npm run typecheck
 npm run build      # esbuild -> dist/server/index.cjs
 ```
@@ -303,6 +323,7 @@ npx devvit install <test subreddit> bastrop-news@<version>
 npx devvit settings set youtubeApiKey
 npx devvit settings set googleCalendarApiKey        # events digest only
 npx devvit settings set eventsDigest                # "on" to enable it
+npx devvit settings set stickyDigest                # optional: "on" to pin each digest
 ```
 
 `devvit upload` updates no install, and `devvit settings set` only accepts keys declared

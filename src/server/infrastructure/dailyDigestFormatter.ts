@@ -1,16 +1,21 @@
-import type { LocalDay } from '../application/localDay.js';
+import type { DailyDigest, DigestEntry } from '../application/digestSchedule.js';
 import type { DigestFormatter, FormattedTextPost } from '../application/ports.js';
-import type { CalendarEvent } from '../domain/calendarEvent.js';
+import { SOURCE_SITE_LINKS, SOURCE_SITE_URL } from '../eventsConfig.js';
 import { REDDIT_TITLE_MAX_LENGTH } from './passthroughFormatter.js';
 
 export const REDDIT_TEXT_MAX_LENGTH = 40_000;
-const SOURCE_SITE_URL = 'https://bastropcountycalendar.com';
 
 /** Characters that change meaning in Reddit markdown. */
 export function escapeMarkdown(text: string): string {
   return text.replace(/[\\`*_~^[\]()>|#]/g, '\\$&');
 }
 
+interface Section {
+  heading: string;
+  lines: string[];
+}
+
+/** Renders a DailyDigest as Reddit markdown. Which event goes where is decided upstream. */
 export class DailyDigestFormatter implements DigestFormatter {
   constructor(
     private readonly timeZone: string,
@@ -18,62 +23,57 @@ export class DailyDigestFormatter implements DigestFormatter {
     private readonly calendarUrl: string | null = null,
   ) {}
 
-  format(day: LocalDay, events: readonly CalendarEvent[]): FormattedTextPost {
-    const dateLabel = new Intl.DateTimeFormat('en-US', {
-      timeZone: this.timeZone,
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-    }).format(day.start);
-    const title = `Happening today in Bastrop County: ${dateLabel}`.slice(0, REDDIT_TITLE_MAX_LENGTH);
+  format(digest: DailyDigest): FormattedTextPost {
+    const longDate = this.date(digest.today.start, { weekday: 'long', month: 'long', day: 'numeric' });
+    const title = `Happening today in Bastrop County: ${longDate}`.slice(0, REDDIT_TITLE_MAX_LENGTH);
 
-    // Multi-day events read as "ongoing" -- their start time is often weeks ago.
-    const isOngoing = (event: CalendarEvent): boolean =>
-      event.allDay || event.start < day.start || event.end > day.end;
-    const ongoing = events.filter(isOngoing);
-    const timed = events
-      .filter((event) => !isOngoing(event))
-      .sort((a, b) => a.start.getTime() - b.start.getTime());
+    // In priority order: when the post is too long, the last sections are cut first.
+    const sections: Section[] = [
+      { heading: `Today: ${this.shortDay(digest.today.start)}`, lines: digest.todayEvents.map((e) => this.dayLine(e)) },
+      { heading: 'Ongoing', lines: digest.ongoing.map((e) => this.line(e, null)) },
+      {
+        heading: `Tomorrow: ${this.shortDay(digest.tomorrow.start)}`,
+        lines: digest.tomorrowEvents.map((e) => this.dayLine(e)),
+      },
+    ].filter((section) => section.lines.length > 0);
 
-    const sections: { heading: string; lines: string[] }[] = [];
-    if (ongoing.length > 0) {
-      sections.push({ heading: 'All day / ongoing', lines: ongoing.map((e) => this.line(e, null)) });
-    }
-    if (timed.length > 0) {
-      sections.push({ heading: 'Today', lines: timed.map((e) => this.line(e, this.time(e.start))) });
-    }
-
-    const footer = this.footer();
-    const body = this.assemble(sections, footer, events.length);
-    return { title, body };
+    const total = sections.reduce((sum, section) => sum + section.lines.length, 0);
+    return { title, body: this.assemble(sections, this.footer(), total) };
   }
 
-  private time(instant: Date): string {
-    return new Intl.DateTimeFormat('en-US', {
-      timeZone: this.timeZone,
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(instant);
+  private date(instant: Date, options: Intl.DateTimeFormatOptions): string {
+    return new Intl.DateTimeFormat('en-US', { timeZone: this.timeZone, ...options }).format(instant);
   }
 
-  private line(event: CalendarEvent, time: string | null): string {
+  /** "Monday, Nov 23" */
+  private shortDay(instant: Date): string {
+    return this.date(instant, { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+
+  private dayLine(entry: DigestEntry): string {
+    const when = entry.event.allDay ? 'All day' : this.date(entry.event.start, { hour: 'numeric', minute: '2-digit' });
+    return this.line(entry, when);
+  }
+
+  private line({ event, through }: DigestEntry, when: string | null): string {
     const title = escapeMarkdown(event.title);
-    const linked = event.url ? `[${title}](${event.url})` : title;
-    const venue = event.location ? ` · ${escapeMarkdown(event.location)}` : '';
-    return `* ${time ? `**${time}**: ` : ''}${linked}${venue}`;
+    const parts = [event.url ? `[${title}](${event.url})` : title];
+    if (event.location) parts.push(escapeMarkdown(event.location));
+    if (through) parts.push(`through ${this.date(through, { weekday: 'short', month: 'short', day: 'numeric' })}`);
+    return `* ${when ? `**${when}**: ` : ''}${parts.join(' · ')}`;
   }
 
   private footer(): string {
+    const links = SOURCE_SITE_LINKS.map((link) => `[${link.label}](${link.url})`).join(' · ');
     const calendar = this.calendarUrl ? ` · [Subscribe to the calendar](${this.calendarUrl})` : '';
-    return `---\n\n*Events from [Bastrop County Calendar](${SOURCE_SITE_URL})${calendar}*`;
+    return (
+      `---\n\n**Plan ahead:** ${links}\n\n` +
+      `*Events from [Bastrop County Calendar](${SOURCE_SITE_URL})${calendar}*`
+    );
   }
 
   /** Stops adding lines before the body would exceed Reddit's self-post limit. */
-  private assemble(
-    sections: { heading: string; lines: string[] }[],
-    footer: string,
-    total: number,
-  ): string {
+  private assemble(sections: Section[], footer: string, total: number): string {
     // Room for the "...and N more" line and the footer, which are always appended.
     const budget = REDDIT_TEXT_MAX_LENGTH - footer.length - 200;
     const parts: string[] = [];

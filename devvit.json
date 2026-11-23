@@ -4,7 +4,7 @@
   "permissions": {
     "reddit": {
       "enable": true,
-      "scope": "user"
+      "scope": "moderator"
     },
     "redis": true,
     "http": {
@@ -87,6 +87,12 @@
         "label": "Events digest hour (0-23, Central time)",
         "helpText": "The digest is posted on the first hourly check at or after this local hour.",
         "defaultValue": 7
+      },
+      "stickyDigest": {
+        "type": "string",
+        "label": "Sticky the daily digest -- \"on\" or \"off\"",
+        "helpText": "\"on\" pins each day's digest and unpins the previous one. It takes a free sticky slot, or replaces the bottom sticky when both are in use. Defaults to \"off\".",
+        "defaultValue": "off"
       }
     }
   },

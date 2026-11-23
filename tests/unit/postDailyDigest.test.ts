@@ -5,6 +5,7 @@ import type { CalendarEvent } from '../../src/server/domain/calendarEvent.js';
 import { DailyDigestFormatter } from '../../src/server/infrastructure/dailyDigestFormatter.js';
 import { FakeDigestStore } from '../fakes/fakeDigestStore.js';
 import { FakeEventSource } from '../fakes/fakeEventSource.js';
+import { FakePostPinner } from '../fakes/fakePostPinner.js';
 import { FakePublisher } from '../fakes/fakePublisher.js';
 
 const TZ = 'America/Chicago';
@@ -23,6 +24,7 @@ function makeUseCase(options: {
   digestStore?: FakeDigestStore;
   publisher?: Publisher;
   formatter?: DigestFormatter;
+  pinner?: FakePostPinner;
   dryRun?: boolean;
 }): PostDailyDigestUseCase {
   return new PostDailyDigestUseCase({
@@ -30,6 +32,7 @@ function makeUseCase(options: {
     digestStore: options.digestStore ?? new FakeDigestStore(),
     formatter: options.formatter ?? new DailyDigestFormatter(TZ),
     publisher: options.publisher ?? new FakePublisher(),
+    pinner: options.pinner,
     subreddit: 'BastropTX',
     timeZone: TZ,
     digestHour: 7,
@@ -67,12 +70,39 @@ describe('PostDailyDigestUseCase', () => {
     expect(digestStore.lastDate).toBe('2026-11-22');
   });
 
-  it('queries local midnight to midnight, not the UTC day', async () => {
+  it('queries from local midnight today to the end of tomorrow, not UTC days', async () => {
     const eventSource = new FakeEventSource([]);
     await makeUseCase({ eventSource }).run();
 
     expect(eventSource.calls[0].start.toISOString()).toBe('2026-11-22T06:00:00.000Z');
-    expect(eventSource.calls[0].end.toISOString()).toBe('2026-11-23T06:00:00.000Z');
+    expect(eventSource.calls[0].end.toISOString()).toBe('2026-11-24T06:00:00.000Z');
+  });
+
+  it('does not post when only tomorrow has events, but marks the day', async () => {
+    const digestStore = new FakeDigestStore();
+    const publisher = new FakePublisher();
+    const tomorrowOnly = makeEvent('t', '2026-11-23T18:00:00Z', '2026-11-23T19:00:00Z');
+    const result = await makeUseCase({ eventSource: new FakeEventSource([tomorrowOnly]), digestStore, publisher }).run();
+
+    expect(result.status).toBe('no_events');
+    expect(publisher.textCalls).toHaveLength(0);
+    expect(digestStore.lastDate).toBe('2026-11-22');
+  });
+
+  it('posts a day with only ongoing events, counting them', async () => {
+    const market = makeEvent('m', '2026-11-07T06:00:00Z', '2026-12-27T06:00:00Z');
+    const result = await makeUseCase({ eventSource: new FakeEventSource([market]) }).run();
+
+    expect(result).toMatchObject({ status: 'posted', eventCount: 1 });
+  });
+
+  it('includes tomorrow in the post without counting it', async () => {
+    const publisher = new FakePublisher();
+    const tomorrow = makeEvent('t', '2026-11-23T18:00:00Z', '2026-11-23T19:00:00Z');
+    const result = await makeUseCase({ eventSource: new FakeEventSource([TODAY_EVENT, tomorrow]), publisher }).run();
+
+    expect(result.eventCount).toBe(1);
+    expect(publisher.textCalls[0].post.body).toContain('Event t');
   });
 
   it('marks an empty day handled without posting', async () => {
@@ -125,5 +155,55 @@ describe('PostDailyDigestUseCase', () => {
       },
     };
     await expect(makeUseCase({ eventSource: failing }).run()).rejects.toThrow('calendar down');
+  });
+
+  describe('pinning', () => {
+    it('unpins the previous digest, pins the new one and remembers it', async () => {
+      const digestStore = new FakeDigestStore(null, 't3_old');
+      const pinner = new FakePostPinner();
+      const result = await makeUseCase({ digestStore, pinner }).run();
+
+      expect(pinner.calls).toEqual(['unpin:t3_old', 'pin:fake-submission-id']);
+      expect(digestStore.pinnedId).toBe('fake-submission-id');
+      expect(result).toMatchObject({ status: 'posted', pinned: true });
+    });
+
+    it('pins without unpinning when nothing was pinned before', async () => {
+      const pinner = new FakePostPinner();
+      await makeUseCase({ pinner }).run();
+
+      expect(pinner.calls).toEqual(['pin:fake-submission-id']);
+    });
+
+    it('still pins when the old post cannot be unpinned (e.g. it was deleted)', async () => {
+      const digestStore = new FakeDigestStore(null, 't3_gone');
+      const pinner = new FakePostPinner('unpin');
+      const result = await makeUseCase({ digestStore, pinner }).run();
+
+      expect(pinner.calls).toEqual(['unpin:t3_gone', 'pin:fake-submission-id']);
+      expect(result.pinned).toBe(true);
+    });
+
+    it('keeps the post and marks the day when pinning fails', async () => {
+      const digestStore = new FakeDigestStore(null, 't3_old');
+      const result = await makeUseCase({ digestStore, pinner: new FakePostPinner('pin') }).run();
+
+      expect(result).toMatchObject({ status: 'posted', pinned: false });
+      expect(digestStore.lastDate).toBe('2026-11-22');
+      expect(digestStore.pinnedId).toBeNull();
+    });
+
+    it('reports nothing about pinning when no pinner is configured', async () => {
+      const result = await makeUseCase({}).run();
+
+      expect(result.pinned).toBeUndefined();
+    });
+
+    it('does not pin in dry run', async () => {
+      const pinner = new FakePostPinner();
+      await makeUseCase({ pinner, dryRun: true }).run();
+
+      expect(pinner.calls).toEqual([]);
+    });
   });
 });

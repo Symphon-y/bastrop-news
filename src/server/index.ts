@@ -89,6 +89,7 @@ app.post('/internal/scheduler/daily-events-digest', async (_req, res) => {
       throw new Error('EVENTS_CALENDAR_ID in src/server/eventsConfig.ts is empty');
     }
     const targetSubreddit = resolveTargetSubreddit(context.subredditName);
+    const publisher = new RedditPublisher(reddit);
 
     const useCase = new PostDailyDigestUseCase({
       eventSource: new GoogleCalendarEventSource(
@@ -98,7 +99,8 @@ app.post('/internal/scheduler/daily-events-digest', async (_req, res) => {
       ),
       digestStore: new RedisDigestStore(redis),
       formatter: new DailyDigestFormatter(EVENTS_TIME_ZONE, publicCalendarUrl(EVENTS_CALENDAR_ID)),
-      publisher: new RedditPublisher(reddit),
+      publisher,
+      pinner: config.sticky ? publisher : undefined,
       subreddit: targetSubreddit,
       timeZone: EVENTS_TIME_ZONE,
       digestHour: config.digestHour,
@@ -114,10 +116,15 @@ app.post('/internal/scheduler/daily-events-digest', async (_req, res) => {
       console.log(
         `daily-events-digest ${result.localDate}: ${result.status} -> r/${targetSubreddit}` +
           `${config.dryRun ? ' (DRY RUN -- nothing posted)' : ''}`,
-        { eventCount: result.eventCount },
+        { eventCount: result.eventCount, pinned: result.pinned },
       );
     }
-    res.json({ localDate: result.localDate, status: result.status, eventCount: result.eventCount });
+    res.json({
+      localDate: result.localDate,
+      status: result.status,
+      eventCount: result.eventCount,
+      pinned: result.pinned,
+    });
   } catch (error) {
     console.error('daily-events-digest run failed', error);
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
